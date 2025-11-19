@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/cirreum/.github/main/profile/cirreum-icon-transparent-001.png" width=360" alt="Cirreum Logo" />
+  <img src="https://raw.githubusercontent.com/cirreum/.github/main/profile/cirreum-icon-transparent-002.png" width=360" alt="Cirreum Logo" />
 </p>
 
 # Cirreum
