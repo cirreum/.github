@@ -335,11 +335,11 @@ Define authorization rules using FluentValidation-style syntax:
 ```csharp
 public class DeleteResourceValidator : AuthorizationValidatorBase<DeleteResourceCommand> {
     public DeleteResourceValidator() {
-        RuleFor(cmd => cmd)
+        RuleFor(context => context)
             .RequireRole<AdminRole>()
             .WithMessage("Only administrators can delete resources");
             
-        RuleFor(cmd => cmd.ResourceId)
+        RuleFor(context => context.Resource.Id)
             .MustAsync(async (id, ctx, ct) => {
                 var resource = await GetResource(id);
                 return resource.OwnerId == ctx.User.Id;
@@ -426,12 +426,6 @@ Cirreum is open source and welcomes contributions! Each repository has its own c
 ## License
 
 Cirreum is licensed under the MIT License. See individual repositories for details.
-
-## Project History
-
-Cirreum evolved from CORR (Championship Off-Road Racing), a private framework developed for managing racing events and building scalable .NET applications. The framework has been refined through real-world use in production environments including mortgage servicing systems handling thousands of daily transactions and racing event management platforms.
-
-Now open-sourced and rebranded as Cirreum, the framework continues to evolve with modern .NET practices while maintaining its core philosophy of runtime-agnostic, Railway-oriented development.
 
 ## Support
 
