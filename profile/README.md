@@ -1,6 +1,14 @@
+<p align="center">
+  <img src="https://raw.githubusercontent.com/cirreum/.github/main/profile/cirreum-icon-transparent-001.png" width=360" alt="Cirreum Logo" />
+</p>
+
 # Cirreum
 
-**A modern, opinionated .NET foundation framework for building scalable, runtime-agnostic applications with Railway-Oriented Programming at its core.**
+<h4>Layered simplicity for modern .NET</h4>
+
+---
+
+## **A modern, opinionated .NET foundation framework for building scalable, runtime-agnostic applications with Railway-Oriented Programming at its core.**
 
 Cirreum provides a comprehensive set of libraries that work seamlessly together to enable rapid development of enterprise-grade applications across Server (ASP.NET Core), Client (Blazor WebAssembly), and Serverless (Azure Functions) environments.
 
