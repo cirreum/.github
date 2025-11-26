@@ -481,6 +481,7 @@ Cirreum is open source and welcomes contributions! Each repository has its own c
 - [ ] More messaging providers (RabbitMQ, AWS)
 - [ ] More storage providers (AWS, others)
 - [ ] More persistence providers (SQL based servers, EFCore)
+- [ ] Add MCP-Native Endpoints Feature
 - [ ] Performance benchmarks
 - [ ] Complete documentation site
 
