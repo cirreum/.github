@@ -170,87 +170,132 @@ ASP.NET Core infrastructure for Railway-to-HTTP conversion and exception handlin
 
 ### 1. Install Packages
 ```bash
-dotnet add package Cirreum.Conductor
+dotnet add package Cirreum.Runtime.Server
+dotnet add package Cirreum.Secrets
 dotnet add package Cirreum.Authorization
-dotnet add package Cirreum.Services.Server
+dotnet add package Cirreum.Persistence
+dotnet add package Cirreum.Communications
 ```
 
 ### 2. Configure Services
 ```csharp
 // Program.cs
-var builder = WebApplication.CreateBuilder(args);
+// ******************************************************************************
+// Configure the WebApplication
+//
+var builder = DomainApplication
+	.CreateBuilder(args);
 
-// Add Cirreum Server infrastructure
-builder.Services.AddCirreumServer();
 
-// Add Conductor with intercepts
-builder.Services.AddCirreumConductor(options => {
-    options.AddIntercept<AuthorizationIntercept>();
-    options.AddIntercept<ValidationIntercept>();
+// ******************************************************************************
+// Add application secrets
+//
+builder.AddSecrets();
+
+
+// ******************************************************************************
+// Add Authentication/Authorization
+//
+builder.AddAuthorization();
+
+
+// ******************************************************************************
+// Add Services to the WebApplication
+//
+
+// Cloud Services
+builder
+	.AddPersistence()
+	.AddSmsServices();
+
+// Internal Services
+builder.Services
+	.AddScoped<IMyService, MyService>();
+
+//
+// OpenApi (if Development)
+//
+if (builder.Environment.IsDevelopment()) {
+	builder.Services.AddOpenApi(options => {
+		options.AddDocumentTransformer<InfoAndContactTransformer>();
+		options.AddSchemaTransformer<PropertyDescriptionTransformer>();
+		options.AddDocumentTransformer<SecuritySchemesTransformer>();
+	});
+}
+
+// *****************************************************************************************************************************
+// Build the DomainApplication
+//
+await using var app = builder.Build<MyDomainTypeInReferenceLib>();
+
+
+// *****************************************************************************************************************************
+// Use the default Middleware
+//
+app.UseDefaultMiddleware();
+
+
+// ******************************************************************************
+// Map Endpoints
+//
+
+// HealthCheck Endpoints
+app.MapDefaultHealthChecks();
+
+// Map Feature Endpoints (Application API)
+app.MapApiEndpoints("/api/v1", api =>{
+	// [Static Class] api.MapGet("/", Customers.GetAll);
+	// [Inline Class]
+  api.MapGet("/", static async (IDispatcher dispatcher, CancellationToken token) =>
+    dispatcher.Dispatcher(new GetAllCustomers(), token) 
+  );
 });
 
-// Add authorization
-builder.Services.AddCirreumAuthorization(options => {
-    options.RegisterRole<AdminRole>();
-    options.RegisterRole<UserRole>();
-});
+// OpenApi
+if (app.Environment.IsDevelopment()) {
+	app.MapOpenApi()
+		.CacheOutput();
+	app.MapScalarApiReference(options => {
+		options.DefaultFonts = false;
+		options.Layout = ScalarLayout.Modern;
+		options.OperationSorter = OperationSorter.Method;
+		options.AddPreferredSecuritySchemes("Bearer");
+		options.WithDefaultHttpClient(ScalarTarget.CSharp, ScalarClient.Curl);
+	});
+}
 
-var app = builder.Build();
+// redirect root requests to the configured endpoint
+app.UseLandingPage();
 
-app.UseAuthentication();
-app.UseAuthorization();
-app.MapControllers();
-app.Run();
+
+// *****************************************************************************************************************************
+// Run the Application...
+//
+await app.RunAsync();
+
 ```
 
 ### 3. Define a Request
 ```csharp
-public record CreateResourceRequest(string Name) : IAuthorizableRequest<ResourceDto> {
-    // Authorization handled automatically by Conductor
+public record GetAllCustomers() : IAuthorizableRequest<IReadOnlyList<CustomerDto>> {
+    // Validation and Authorization handled automatically by Conductor
+}
+// optionally if you want query caching
+public record GetAllCustomers() : IDomainCacheableQuery<IReadOnlyList<CustomerDto>> {
+    // Validation and Authorization handled automatically by Conductor
 }
 ```
 
 ### 4. Implement Handler
 ```csharp
-public class CreateResourceHandler : IRequestHandler<CreateResourceRequest, ResourceDto> {
-    private readonly IRepository<Resource> _repository;
-
-    public CreateResourceHandler(IRepository<Resource> repository) {
-        _repository = repository;
-    }
-
-    public async Task<Result<ResourceDto>> Handle(
-        CreateResourceRequest request,
-        CancellationToken cancellationToken) {
-        
-        var resource = new Resource { Name = request.Name };
-        await _repository.AddAsync(resource, cancellationToken);
-        
-        return Result<ResourceDto>.Success(
-            new ResourceDto(resource.Id, resource.Name)
-        );
-    }
-}
-```
-
-### 5. Create Controller
-```csharp
-[ApiController]
-[Route("api/[controller]")]
-public class ResourcesController : ControllerBase {
-    private readonly IDispatcher _dispatcher;
-
-    public ResourcesController(IDispatcher dispatcher) {
-        _dispatcher = dispatcher;
-    }
-
-    [HttpPost]
-    public async Task<Result<ResourceDto>> Create(
-        [FromBody] CreateResourceRequest request,
-        CancellationToken cancellationToken) {
-        
-        // Authorization, validation, and Result→HTTP conversion happen automatically
-        return await _dispatcher.Dispatch(request, cancellationToken);
+public class GetAllCustomersHandler(
+    IRepository<Resource> repository
+) : IRequestHandler<GetAllCustomers, IReadOnlyList<CustomerDto>> {
+    
+    public async Task<Result<IReadOnlyList<CustomerDto>>> HandleAsync(
+        GetAllCustomers request,
+        CancellationToken cancellationToken) =>
+            await _repository.GetAll(cancellationToken);
     }
 }
 ```
