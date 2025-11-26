@@ -414,12 +414,10 @@ Cirreum is open source and welcomes contributions! Each repository has its own c
 
 ## Roadmap
 
-- [ ] OpenTelemetry integration
-- [ ] GraphQL support
-- [ ] gRPC support
-- [ ] Distributed tracing
-- [ ] More messaging providers (RabbitMQ, Azure Service Bus)
-- [ ] Additional authentication providers
+- [ ] Fix all the documentation and readme files
+- [ ] More messaging providers (RabbitMQ, AWS)
+- [ ] More storage providers (AWS, others)
+- [ ] More persistence providers (SQL based servers, EFCore)
 - [ ] Performance benchmarks
 - [ ] Complete documentation site
 
