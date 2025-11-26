@@ -248,11 +248,12 @@ app.MapDefaultHealthChecks();
 
 // Map Feature Endpoints (Application API)
 app.MapApiEndpoints("/api/v1", api => {
-	// [Static Class] api.MapGet("/", Customers.GetAll);
-	// [Inline Class]
-  api.MapGet("/", static async (IDispatcher dispatcher, CancellationToken token) =>
-    dispatcher.Dispatcher(new GetAllCustomers(), token) 
-  );
+    // [Static Class] CustomersApi.MapEndpoints(api);
+	// [Static Inline] api.MapGet("/", Customers.GetAll);
+	// [Inline]
+    api.MapGet("/", static async (IDispatcher dispatcher, CancellationToken token) =>
+      dispatcher.Dispatcher(new GetAllCustomers(), token) 
+    );
 });
 
 // OpenApi
