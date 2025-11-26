@@ -182,7 +182,7 @@ dotnet add package Cirreum.Runtime.Storage
 ```csharp
 // Program.cs
 // ******************************************************************************
-// Configure the WebApplication
+// Configure the DomainApplication
 //
 var builder = DomainApplication
 	.CreateBuilder(args);
@@ -201,12 +201,15 @@ builder.AddAuthorization();
 
 
 // ******************************************************************************
-// Add Services to the WebApplication
+// Add Services to the DomainApplication
 //
 
 // Cloud Services
 builder
 	.AddPersistence()
+	.AddStorage()
+	.AddMessaging()
+	.AddEmailServices()
 	.AddSmsServices();
 
 // Internal Services
@@ -244,7 +247,7 @@ app.UseDefaultMiddleware();
 app.MapDefaultHealthChecks();
 
 // Map Feature Endpoints (Application API)
-app.MapApiEndpoints("/api/v1", api =>{
+app.MapApiEndpoints("/api/v1", api => {
 	// [Static Class] api.MapGet("/", Customers.GetAll);
 	// [Inline Class]
   api.MapGet("/", static async (IDispatcher dispatcher, CancellationToken token) =>
@@ -270,7 +273,7 @@ app.UseLandingPage();
 
 
 // *****************************************************************************************************************************
-// Run the Application...
+// Run the DomainApplication...
 //
 await app.RunAsync();
 
@@ -283,14 +286,14 @@ public record GetAllCustomers() : IAuthorizableRequest<IReadOnlyList<CustomerDto
 }
 // optionally if you want query caching
 public record GetAllCustomers() : IDomainCacheableQuery<IReadOnlyList<CustomerDto>> {
-    // Validation and Authorization handled automatically by Conductor
+    // Caching, Auditing, Validation and Authorization handled automatically by Conductor
 }
 ```
 
 ### 4. Implement Handler
 ```csharp
 public class GetAllCustomersHandler(
-    IRepository<Resource> repository
+    IRepository<Customer> repository
 ) : IRequestHandler<GetAllCustomers, IReadOnlyList<CustomerDto>> {
     
     public async Task<Result<IReadOnlyList<CustomerDto>>> HandleAsync(
