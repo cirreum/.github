@@ -66,7 +66,24 @@ await dispatcher.Dispatch(new GetResourceQuery(id), cancellationToken);
 
 ## Core Libraries
 
-### 🚂 [Cirreum.Conductor](https://github.com/cirreum/Cirreum.Conductor)
+### 🚂 [Cirreum.Result](https://github.com/cirreum/Cirreum.Result)
+A lightweight, allocation‑free, struct‑based Result monad designed for high‑performance .NET applications.
+Provides a complete toolkit for functional, exception‑free control flow with full async support, validation, inspection, and monadic composition.
+
+**Key Features:**
+- Struct-based: No heap allocations on the success path.
+- Unified Success/Failure Model using Result and Result<T>.
+- Full async support
+- ValueTask + Task
+- Async variants of Map, Then, Ensure, Inspect, failure handlers, etc.
+- Validation pipeline with Ensure (sync + async).
+- Inspection helpers: Inspect, InspectTry.
+- Composable monad API:
+- Map, Then, Match, Switch, TryGetValue, TryGetError, and more.
+- Ergonomic extension methods for async workflows.
+- Zero exceptions for control flow—exceptions are captured as failures.
+
+### 🚂 [Cirreum.Conductor](https://github.com/cirreum/Cirreum.Core/tree/main/src/Cirreum.Core/Conductor)
 Request/response pipeline with intercept-based architecture. Dispatch commands and queries through a configurable pipeline with automatic authorization, validation, and cross-cutting concerns.
 
 **Key Features:**
@@ -75,7 +92,7 @@ Request/response pipeline with intercept-based architecture. Dispatch commands a
 - Generic constraint-based registration
 - Full async/await support with cancellation
 
-### 🔐 [Cirreum.Authorization](https://github.com/cirreum/Cirreum.Authorization)
+### 🔐 Cirreum.Authorization
 Resource-level authorization with role-based access control. FluentValidation-style syntax for declaring authorization rules.
 
 **Key Features:**
@@ -85,7 +102,7 @@ Resource-level authorization with role-based access control. FluentValidation-st
 - Automatic integration with Conductor pipeline
 - Works with any authentication provider
 
-### ✅ [Cirreum.Validation](https://github.com/cirreum/Cirreum.Validation)
+### ✅ Cirreum.Validation
 FluentValidation integration for request validation with automatic Railway conversion.
 
 **Key Features:**
