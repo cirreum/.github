@@ -171,10 +171,11 @@ ASP.NET Core infrastructure for Railway-to-HTTP conversion and exception handlin
 ### 1. Install Packages
 ```bash
 dotnet add package Cirreum.Runtime.Server
-dotnet add package Cirreum.Secrets
-dotnet add package Cirreum.Authorization
-dotnet add package Cirreum.Persistence
-dotnet add package Cirreum.Communications
+dotnet add package Cirreum.Runtime.Secrets
+dotnet add package Cirreum.Runtime.Authorization
+dotnet add package Cirreum.Runtime.Persistence
+dotnet add package Cirreum.Runtime.Communications
+dotnet add package Cirreum.Runtime.Storage
 ```
 
 ### 2. Configure Services
