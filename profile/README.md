@@ -2,6 +2,10 @@
 
 <h4>Layered simplicity for modern .NET</h4>
 
+[![FOSSA Status](https://app.fossa.com/api/projects/custom%2B59874%2FCirreum%5C.svg?type=shield&issueType=security)](https://app.fossa.com/projects/custom%2B59874%2FCirreum%5C?ref=badge_shield&issueType=security)
+
+[![FOSSA Status](https://app.fossa.com/api/projects/custom%2B59874%2FCirreum%5C.svg?type=shield&issueType=license)](https://app.fossa.com/projects/custom%2B59874%2FCirreum%5C?ref=badge_shield&issueType=license)
+
 <p align="right">
   <img src="https://raw.githubusercontent.com/cirreum/.github/main/profile/cirreum-icon-transparent-002.png" width=180" alt="Cirreum Logo" />
 </p>
