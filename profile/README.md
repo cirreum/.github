@@ -1,13 +1,9 @@
-
-<div>
-<p align="middle">
-  <img src="https://raw.githubusercontent.com/cirreum/.github/main/profile/cirreum-icon-transparent-002.png" width="180" alt="Cirreum Logo" />
-  <br/>
-  <span style="font-size: 32px;font-weight: bold;">Cirreum</span>
+<p align="center">
+  <img src="https://raw.githubusercontent.com/cirreum/.github/main/profile/cirreum-icon-transparent-002.png" width="180" alt="Cirreum" />
 </p>
-</div>
 
-<h4>Layered simplicity for modern .NET</h4>
+<h1 align="center">Cirreum</h1>
+<h4 align="center">Layered simplicity for modern .NET</h4>
 
 ## **A modern, opinionated foundation framework built on Domain-first principles—define your models and operations once, consume them across multiple applications—with Railway-Oriented Programming ensuring clean, composable control flow throughout.**
 
