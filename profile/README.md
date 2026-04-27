@@ -191,182 +191,143 @@ Cirreum is organized into consistent dependency layers and split between two tra
 
 **Main track** — the framework spine. Apps reference `Cirreum.Core` + a `Cirreum.Services.{host}` + a `Cirreum.Runtime.{host}` directly. Linear dependency chain. Not pluggable.
 
-**Provider tracks** — pluggable cross-cutting services. Each provider family (Identity, Authorization, Persistence, Communications, Messaging, Storage, Secrets) follows the same shape:
+**Provider tracks** — pluggable cross-cutting services. Each provider family (Authorization, Identity, Persistence, Communications, Messaging, Storage, Secrets) follows the same shape:
 
 ```
-Cirreum.{Family}Provider     # contracts & registration core
-Cirreum.{Family}.{Impl}      # concrete implementation
-Cirreum.Runtime.{Family}     # app-facing umbrella; pulls Impl transitively
+Cirreum.{Family}Provider     # contracts & registration core      (Core/)
+Cirreum.{Family}.{Impl}      # concrete implementation             (Infrastructure/)
+Cirreum.Runtime.{Family}     # app-facing umbrella; pulls Impl transitively  (Runtime Extensions/)
 ```
 
 App code installs only the `Cirreum.Runtime.{Family}` umbrella. Implementations flow in transitively, and you can swap providers without touching app code.
 
-## Core Libraries
+The full repo catalog below is organized by folder (each folder is a layer).
 
-### 🚂 [Cirreum.Result](https://github.com/cirreum/Cirreum.Result)
+## Library Catalog
 
-A lightweight, allocation‑free, struct‑based Result monad designed for high‑performance .NET applications.
-Provides a complete toolkit for functional, exception‑free control flow with full async support, validation, inspection, and monadic composition.
+Every published Cirreum repo, organized by folder. Each folder is a layer; within a layer, a package is either part of the **main track** (the linear framework spine) or a **provider track** (a pluggable service family).
 
-**Key Features:**
+### Base — zero dependencies
 
-- Struct-based: No heap allocations on the success path.
-- Unified Success/Failure Model using Result and Result&lt;T&gt;.
-- Full async support
-- ValueTask + Task
-- Async variants of Map, Then, Ensure, Inspect, failure handlers, etc.
-- Validation pipeline with Ensure (sync + async).
-- Inspection helpers: Inspect, InspectTry.
-- Composable monad API:
-- Map, Then, Match, Switch, TryGetValue, TryGetError, and more.
-- Ergonomic extension methods for async workflows.
-- Zero exceptions for control flow—exceptions are captured as failures.
+| Package | Track | Description |
+| --------- | ------- | ------------- |
+| [Cirreum.Result](https://github.com/cirreum/Cirreum.Result) | main | Struct-based, allocation-free `Result` / `Result<T>` monad with full async support and monadic composition (Map, Then, Ensure, Match, Switch). |
+| [Cirreum.Exceptions](https://github.com/cirreum/Cirreum.Exceptions) | main | Typed exception hierarchy (`NotFoundException`, `ForbiddenException`, `ValidationException`, …) designed to be captured as `Result<T>.Fail(...)`. RFC 7807 ProblemDetails mapping. |
 
-### ⚠️ [Cirreum.Exceptions](https://github.com/cirreum/Cirreum.Exceptions)
+### Common — framework-neutral, host-agnostic abstractions
 
-Lightweight exception types designed to be captured as `Result<T>` failures rather than thrown. Pairs with `Cirreum.Result` for railway-oriented error flow.
+| Package | Track | Description |
+| --------- | ------- | ------------- |
+| [Cirreum.Communications.Email](https://github.com/cirreum/Cirreum.Communications.Email) | Communications | Email sender contracts and templates. |
+| [Cirreum.Communications.Sms](https://github.com/cirreum/Cirreum.Communications.Sms) | Communications | SMS sender contracts and templates. |
+| [Cirreum.Cors](https://github.com/cirreum/Cirreum.Cors) | main | CORS configuration helpers. |
+| [Cirreum.ExpressionBuilder](https://github.com/cirreum/Cirreum.ExpressionBuilder) | main | Dynamic LINQ expression-tree utilities. |
+| [Cirreum.Logging.Deferred](https://github.com/cirreum/Cirreum.Logging.Deferred) | main | Deferred / batched logging primitives. |
+| [Cirreum.Messaging](https://github.com/cirreum/Cirreum.Messaging) | Messaging | Message queue / pub-sub abstractions. |
+| [Cirreum.Persistence.NoSql](https://github.com/cirreum/Cirreum.Persistence.NoSql) | Persistence | Document-database repository + unit-of-work abstractions. |
+| [Cirreum.Persistence.Sql](https://github.com/cirreum/Cirreum.Persistence.Sql) | Persistence | SQL repository abstractions built on Dapper. |
+| [Cirreum.Providers](https://github.com/cirreum/Cirreum.Providers) | infra | Provider-pattern plumbing shared across all provider tracks. |
+| [Cirreum.Startup](https://github.com/cirreum/Cirreum.Startup) | main | `DomainApplication` host-bootstrap helpers. |
+| [Cirreum.Storage](https://github.com/cirreum/Cirreum.Storage) | Storage | Blob storage abstractions. |
+| [Cirreum.Storage.Browser](https://github.com/cirreum/Cirreum.Storage.Browser) | Storage | Browser-side storage helpers (LocalStorage, SessionStorage, IndexedDB). |
 
-**Key Features:**
+### Core — the framework spine
 
-- Typed exceptions for common failure modes: `NotFoundException`, `ForbiddenException`, `UnauthorizedException`, `ValidationException`, `ConflictException`, etc.
-- Implicit conversion to `Result<T>.Fail(...)`
-- RFC 7807 ProblemDetails mapping
-- Rich error metadata for HTTP response generation
+| Package | Track | Description |
+| --------- | ------- | ------------- |
+| [Cirreum.Core](https://github.com/cirreum/Cirreum.Core) | main | Conductor pipeline (`IDispatcher`, intercepts), validation, the framework spine. |
+| [Cirreum.Components.WebAssembly](https://github.com/cirreum/Cirreum.Components.WebAssembly) | main | Reusable Blazor components (TreeView, DataGrid, forms) with multi-theme support. |
+| [Cirreum.AuthorizationProvider](https://github.com/cirreum/Cirreum.AuthorizationProvider) | Authorization (core) | Provider contracts and registration for authorization. |
+| [Cirreum.IdentityProvider](https://github.com/cirreum/Cirreum.IdentityProvider) | Identity (core) | Provisioning contracts and instance-keying. |
+| [Cirreum.SecretsProvider](https://github.com/cirreum/Cirreum.SecretsProvider) | Secrets (core) | Secret-store contracts and registration. |
+| [Cirreum.ServiceProvider](https://github.com/cirreum/Cirreum.ServiceProvider) | infra | Runtime service-registration plumbing used by other provider tracks. |
 
-### 🚂 [Cirreum.Core](https://github.com/cirreum/Cirreum.Core)
+### Infrastructure — provider implementations and host services
 
-#### Conductor
+**Authorization providers**
 
-Request/response pipeline with intercept-based architecture. Dispatch commands and queries through a configurable pipeline with automatic authorization, validation, and cross-cutting concerns.
+| Package | Description |
+| --------- | ------------- |
+| [Cirreum.Authorization.ApiKey](https://github.com/cirreum/Cirreum.Authorization.ApiKey) | API-key bearer authorization. |
+| [Cirreum.Authorization.Entra](https://github.com/cirreum/Cirreum.Authorization.Entra) | Microsoft Entra ID (workforce / employee tenant). |
+| [Cirreum.Authorization.External](https://github.com/cirreum/Cirreum.Authorization.External) | External JWT bearer (arbitrary OIDC issuer). |
+| [Cirreum.Authorization.Oidc](https://github.com/cirreum/Cirreum.Authorization.Oidc) | Generic OIDC bearer. |
+| [Cirreum.Authorization.SignedRequest](https://github.com/cirreum/Cirreum.Authorization.SignedRequest) | HMAC-signed-request authorization (server side). |
+| [Cirreum.Authorization.SignedRequest.Client](https://github.com/cirreum/Cirreum.Authorization.SignedRequest.Client) | HMAC-signed-request client SDK. |
 
-**Key Features:**
+**Identity providers**
 
-- MediatR-style request dispatching with `Result<T>` return types
-- Intercept pattern for cross-cutting concerns
-- Generic constraint-based registration
-- Full async/await support with cancellation
+| Package | Description |
+| --------- | ------------- |
+| [Cirreum.Identity.EntraExternalId](https://github.com/cirreum/Cirreum.Identity.EntraExternalId) | Microsoft Entra External ID provisioning. |
+| [Cirreum.Identity.Oidc](https://github.com/cirreum/Cirreum.Identity.Oidc) | Generic OIDC provisioning (Auth0, Okta, Descope, Keycloak, …). |
 
-#### ✅ Cirreum.Validation
+**Persistence implementations**
 
-FluentValidation integration for request validation with automatic Railway conversion.
+| Package | Description |
+| --------- | ------------- |
+| [Cirreum.Persistence.Azure](https://github.com/cirreum/Cirreum.Persistence.Azure) | Azure Cosmos DB. |
+| [Cirreum.Persistence.SQLite](https://github.com/cirreum/Cirreum.Persistence.SQLite) | SQLite. |
+| [Cirreum.Persistence.SqlServer](https://github.com/cirreum/Cirreum.Persistence.SqlServer) | SQL Server (Dapper). |
 
-**Key Features:**
+**Communications implementations**
 
-- Automatic validation through Conductor intercept
-- Converts validation failures to `Result.Fail()`
-- RFC 7807 ProblemDetails format
-- Custom validation rules and async validators
+| Package | Description |
+| --------- | ------------- |
+| [Cirreum.Communications.Email.Azure](https://github.com/cirreum/Cirreum.Communications.Email.Azure) | Azure Communication Services email. |
+| [Cirreum.Communications.Email.SendGrid](https://github.com/cirreum/Cirreum.Communications.Email.SendGrid) | Twilio SendGrid email. |
+| [Cirreum.Communications.Sms.Azure](https://github.com/cirreum/Cirreum.Communications.Sms.Azure) | Azure Communication Services SMS. |
+| [Cirreum.Communications.Sms.Twilio](https://github.com/cirreum/Cirreum.Communications.Sms.Twilio) | Twilio SMS. |
 
-### 🔐 [Cirreum.Authorization](https://github.com/cirreum/Cirreum.Authorization)
+**Other implementations**
 
-Resource-level authorization with context-based, attribute-based, and role-based access control. FluentValidation-style syntax for declaring authorization rules. Pluggable across identity providers — provider track.
+| Package | Track | Description |
+| --------- | ------- | ------------- |
+| [Cirreum.Storage.Azure](https://github.com/cirreum/Cirreum.Storage.Azure) | Storage | Azure Blob Storage. |
+| [Cirreum.Messaging.Azure](https://github.com/cirreum/Cirreum.Messaging.Azure) | Messaging | Azure Service Bus. |
+| [Cirreum.Secrets.Azure](https://github.com/cirreum/Cirreum.Secrets.Azure) | Secrets | Azure Key Vault. |
+| [Cirreum.Graph.Provider](https://github.com/cirreum/Cirreum.Graph.Provider) | infra | Microsoft Graph SDK provider. |
+| [Cirreum.QueryCache.Distributed](https://github.com/cirreum/Cirreum.QueryCache.Distributed) | infra | Distributed cache backing for `Conductor.ICacheableOperation`. |
+| [Cirreum.QueryCache.Hybrid](https://github.com/cirreum/Cirreum.QueryCache.Hybrid) | infra | Hybrid (in-memory + distributed) cache backing. |
 
-**Key Features:**
+**Host services (main track)**
 
-- Resource-specific authorization validators
-- Runtime-wide policy validators
-- Role hierarchy and inheritance
-- Automatic integration with Conductor pipeline
-- Provider-agnostic — swap identity backends without changing app code
+| Package | Description |
+| --------- | ------------- |
+| [Cirreum.Services.Server](https://github.com/cirreum/Cirreum.Services.Server) | ASP.NET Core host services — Result-to-HTTP, ProblemDetails, etc. |
+| [Cirreum.Services.Wasm](https://github.com/cirreum/Cirreum.Services.Wasm) | Blazor WASM host services. |
+| [Cirreum.Services.Serverless](https://github.com/cirreum/Cirreum.Services.Serverless) | Azure Functions host services. |
 
-App entry point: `Cirreum.Runtime.Authorization`.
+### Runtime — main-track app entry points + provider runtime cores
 
-### 🪪 [Cirreum.Identity](https://github.com/cirreum/Cirreum.Identity)
+| Package | Track | Description |
+| --------- | ------- | ------------- |
+| [Cirreum.Runtime.Server](https://github.com/cirreum/Cirreum.Runtime.Server) | main | App package for ASP.NET Core hosts. |
+| [Cirreum.Runtime.Wasm](https://github.com/cirreum/Cirreum.Runtime.Wasm) | main | App package for Blazor WASM hosts. |
+| [Cirreum.Runtime.Serverless](https://github.com/cirreum/Cirreum.Runtime.Serverless) | main | App package for Azure Functions hosts. |
+| [Cirreum.Runtime.AuthorizationProvider](https://github.com/cirreum/Cirreum.Runtime.AuthorizationProvider) | Authorization (runtime core) | Runtime-side core for the authorization provider track. |
+| [Cirreum.Runtime.IdentityProvider](https://github.com/cirreum/Cirreum.Runtime.IdentityProvider) | Identity (runtime core) | Runtime-side core for the identity provider track. |
+| [Cirreum.Runtime.SecretsProvider](https://github.com/cirreum/Cirreum.Runtime.SecretsProvider) | Secrets (runtime core) | Runtime-side core for the secrets provider track. |
+| [Cirreum.Runtime.ServiceProvider](https://github.com/cirreum/Cirreum.Runtime.ServiceProvider) | infra | Runtime-side provider-pattern plumbing. |
 
-User provisioning and identity-provider integration. Each identity provider runs as its own keyed instance with its own provisioner — multiple providers can coexist in the same app.
+### Runtime Extensions — provider-track app umbrellas (what your app actually installs)
 
-**Supported providers:**
-
-- **OIDC** (`Cirreum.Runtime.Identity.Oidc`) — generic OpenID Connect (Auth0, Okta, Descope, Keycloak, etc.)
-- **Microsoft Entra External ID** (`Cirreum.Runtime.Identity.EntraExternalId`)
-
-**Key Features:**
-
-- Multi-tenant: register multiple providers side-by-side, keyed by config
-- Pluggable provisioning: inherit `InvitationUserProvisionerBase<T>` or `SelfServiceUserProvisionerBase<T>` — class choice IS the onboarding-mode declaration
-- Configured key (`Cirreum:Identity:Providers:{Oidc|EntraExternalId}:Instances:{key}`) auto-flows as `ProvisionContext.Source` and as the keyed DI registration
-- Footgun guards on issuer / scheme / audience misconfiguration
-
-App entry point: `Cirreum.Runtime.Identity` (umbrella) or per-protocol `Cirreum.Runtime.Identity.Oidc` / `Cirreum.Runtime.Identity.EntraExternalId`.
-
-### 🗄️ [Cirreum.Persistence.NoSql](https://github.com/cirreum/Cirreum.Persistence.NoSql)
-
-Document database abstractions with repository and unit of work patterns. Currently supports Azure Cosmos DB with a provider-agnostic interface.
-
-**Key Features:**
-
-- Generic repository pattern with specification support
-- Unit of work coordination for transactional consistency
-- Azure Cosmos DB implementation
-- Optimistic concurrency with ETag support
-- Partition key management
-
-### 🗄️ [Cirreum.Persistence.Sql](https://github.com/cirreum/Cirreum.Persistence.Sql)
-
-Lightweight SQL data access built on Dapper. Provides repository abstractions without the overhead of a full ORM.
-
-**Key Features:**
-
-- Generic repository pattern extending Dapper
-- SQL Server and SQLite implementations
-- Connection management and transaction support
-- Bulk operations support
-- Query builder helpers
-
-### 📦 [Cirreum.Storage](https://github.com/cirreum/Cirreum.Storage)
-
-Blob storage abstractions with Azure Blob Storage and local file system implementations.
-
-**Key Features:**
-
-- Provider-agnostic storage interface
-- Streaming support for large files
-- Metadata management
-- SAS token generation for Azure
-
-### 📧 [Cirreum.Messaging](https://github.com/cirreum/Cirreum.Messaging)
-
-Email and SMS communication with Twilio (SendGrid) and Azure Communication Services support.
-
-**Key Features:**
-
-- Template-based messaging
-- Retry logic with exponential backoff
-- Health checks and monitoring
-- Azure Key Vault integration for credentials
-
-### 🔑 [Cirreum.Secrets](https://github.com/cirreum/Cirreum.Secrets)
-
-Secret management with Azure Key Vault integration and local development fallbacks.
-
-**Key Features:**
-
-- Unified secret access interface
-- Azure Key Vault provider
-- Local development configuration
-- Automatic credential refresh
-
-### 🎨 [Cirreum.Components.WebAssembly](https://github.com/cirreum/Cirreum.Components.WebAssembly)
-
-Reusable Blazor components with theming support.
-
-**Key Features:**
-
-- TreeView, DataGrid, and form components
-- Focus trap and accessibility helpers
-- Dark mode support
-- Multiple theme variants (Office, Excel, Windows, Aspire)
-
-### 🌐 [Cirreum.Services.Server](https://github.com/cirreum/Cirreum.Services.Server)
-
-ASP.NET Core infrastructure for Railway-to-HTTP conversion and exception handling.
-
-**Key Features:**
-
-- Automatic `Result<T>` to HTTP response conversion
-- Global exception handler with ProblemDetails
-- RFC 7807 compliant error responses
-- Content negotiation support
+| Package | Track | Description |
+| --------- | ------- | ------------- |
+| [Cirreum.Runtime.Authorization](https://github.com/cirreum/Cirreum.Runtime.Authorization) | Authorization | `builder.AddAuthorization(...)` umbrella; pulls authorization providers transitively. |
+| [Cirreum.Runtime.Communications](https://github.com/cirreum/Cirreum.Runtime.Communications) | Communications | Email + SMS umbrella. |
+| [Cirreum.Runtime.Identity](https://github.com/cirreum/Cirreum.Runtime.Identity) | Identity | `builder.AddIdentity(p => p.AddProvisioner<T>(key))` cross-protocol umbrella. |
+| [Cirreum.Runtime.Identity.Oidc](https://github.com/cirreum/Cirreum.Runtime.Identity.Oidc) | Identity | Per-protocol entry: generic OIDC. |
+| [Cirreum.Runtime.Identity.EntraExternalId](https://github.com/cirreum/Cirreum.Runtime.Identity.EntraExternalId) | Identity | Per-protocol entry: Entra External ID. |
+| [Cirreum.Runtime.Messaging](https://github.com/cirreum/Cirreum.Runtime.Messaging) | Messaging | Messaging umbrella. |
+| [Cirreum.Runtime.Persistence](https://github.com/cirreum/Cirreum.Runtime.Persistence) | Persistence | Persistence umbrella (provider-agnostic). |
+| [Cirreum.Runtime.Persistence.Azure](https://github.com/cirreum/Cirreum.Runtime.Persistence.Azure) | Persistence | Cosmos DB. |
+| [Cirreum.Runtime.Persistence.SQLite](https://github.com/cirreum/Cirreum.Runtime.Persistence.SQLite) | Persistence | SQLite. |
+| [Cirreum.Runtime.Persistence.SqlServer](https://github.com/cirreum/Cirreum.Runtime.Persistence.SqlServer) | Persistence | SQL Server. |
+| [Cirreum.Runtime.Secrets](https://github.com/cirreum/Cirreum.Runtime.Secrets) | Secrets | Azure Key Vault umbrella. |
+| [Cirreum.Runtime.Storage](https://github.com/cirreum/Cirreum.Runtime.Storage) | Storage | Azure Blob Storage umbrella. |
+| [Cirreum.Runtime.Wasm.Msal](https://github.com/cirreum/Cirreum.Runtime.Wasm.Msal) | Identity (WASM) | WASM client identity flows via MSAL (Entra workforce / B2C). |
+| [Cirreum.Runtime.Wasm.Oidc](https://github.com/cirreum/Cirreum.Runtime.Wasm.Oidc) | Identity (WASM) | WASM client identity flows via generic OIDC. |
 
 ## Quick Start
 
