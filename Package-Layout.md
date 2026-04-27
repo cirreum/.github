@@ -8,6 +8,11 @@ L5 → L4 → L3 → L2 → L1 → L0
 
 > **Note:** Not every package references all layers. For example, most Layer 3 packages reference Layer 1, but some also reference Layer 2.
 
+Packages also belong to one of two **tracks**:
+
+- **App Track** — the linear framework spine. App code references multiple layers directly.
+- **Provider Track** — pluggable cross-cutting services (Authorization, Identity, Persistence, Communications, Messaging, Storage, Secrets). App code references only the L5 umbrella; implementations flow in transitively.
+
 ---
 
 ## Layer 0 (Base)
@@ -48,6 +53,7 @@ Dependency light - Cross Env/Host (Browser, Server, Serverless).
 
 ### Provider Track
 - `Cirreum.AuthorizationProvider` - extends Cirreum.Providers
+- `Cirreum.IdentityProvider` - extends Cirreum.Providers
 - `Cirreum.SecretsProvider` - extends Cirreum.Providers
 - `Cirreum.ServiceProvider` - extends Cirreum.Providers
 
@@ -56,14 +62,26 @@ Dependency light - Cross Env/Host (Browser, Server, Serverless).
 ## Layer 3 (Infrastructure)
 
 ### Provider Track (implementations)
+
+**Authorization**
 - `Cirreum.Authorization.ApiKey` - extends Cirreum.AuthorizationProvider
 - `Cirreum.Authorization.Entra` - extends Cirreum.AuthorizationProvider
+- `Cirreum.Authorization.External` - extends Cirreum.AuthorizationProvider
+- `Cirreum.Authorization.Oidc` - extends Cirreum.AuthorizationProvider
 - `Cirreum.Authorization.SignedRequest` - extends Cirreum.AuthorizationProvider
 - `Cirreum.Authorization.SignedRequest.Client` - extends Cirreum.AuthorizationProvider
+
+**Identity**
+- `Cirreum.Identity.EntraExternalId` - extends Cirreum.IdentityProvider
+- `Cirreum.Identity.Oidc` - extends Cirreum.IdentityProvider
+
+**Communications**
 - `Cirreum.Communications.Email.Azure` - extends Cirreum.Communications.Email and Cirreum.ServiceProvider
 - `Cirreum.Communications.Email.SendGrid` - extends Cirreum.Communications.Email and Cirreum.ServiceProvider
 - `Cirreum.Communications.Sms.Azure` - extends Cirreum.Communications.Sms and Cirreum.ServiceProvider
 - `Cirreum.Communications.Sms.Twilio` - extends Cirreum.Communications.Sms and Cirreum.ServiceProvider
+
+**Messaging / Persistence / Storage / Secrets**
 - `Cirreum.Messaging.Azure` - extends Cirreum.Messaging and Cirreum.ServiceProvider
 - `Cirreum.Persistence.Azure` - extends Cirreum.Persistence.NoSql and Cirreum.ServiceProvider
 - `Cirreum.Persistence.SqlServer` - extends Cirreum.Persistence.Sql and Cirreum.ServiceProvider
@@ -81,8 +99,8 @@ Depends on Cirreum.Core.
 ### App Track
 Implements Cirreum.Core host-specific services, enforces patterns/conventions.
 
-- `Cirreum.Services.Client`
 - `Cirreum.Services.Server`
+- `Cirreum.Services.Wasm`
 - `Cirreum.Services.Serverless`
 
 ---
@@ -93,12 +111,13 @@ Hosting implementation.
 
 ### Provider Track
 - `Cirreum.Runtime.AuthorizationProvider`
+- `Cirreum.Runtime.IdentityProvider`
 - `Cirreum.Runtime.SecretsProvider`
 - `Cirreum.Runtime.ServiceProvider`
 
 ### App Track
-- `Cirreum.Runtime.Client`
 - `Cirreum.Runtime.Server`
+- `Cirreum.Runtime.Wasm`
 - `Cirreum.Runtime.Serverless`
 
 ---
@@ -108,15 +127,26 @@ Hosting implementation.
 Optional extensions that compose lower layers and services. Allows single-call registration of all Registrars using appsettings/Cirreum.Secrets.
 
 ### Provider Track
+
+**Authorization / Identity**
 - `Cirreum.Runtime.Authorization`
-- `Cirreum.Runtime.Client.Msal`
-- `Cirreum.Runtime.Client.Oidc`
+- `Cirreum.Runtime.Identity` *(cross-protocol identity umbrella)*
+- `Cirreum.Runtime.Identity.Oidc` *(generic OIDC: Auth0, Okta, Descope, Keycloak, etc.)*
+- `Cirreum.Runtime.Identity.EntraExternalId` *(Microsoft Entra External ID)*
+- `Cirreum.Runtime.Wasm.Msal` *(WASM client identity flows via MSAL — Entra workforce / B2C)*
+- `Cirreum.Runtime.Wasm.Oidc` *(WASM client identity flows via generic OIDC)*
+
+**Communications / Messaging**
 - `Cirreum.Runtime.Communications` *(SMS and Email)*
 - `Cirreum.Runtime.Messaging`
+
+**Persistence**
 - `Cirreum.Runtime.Persistence` *(all persistence providers)*
 - `Cirreum.Runtime.Persistence.Azure` *(just the Azure provider)*
 - `Cirreum.Runtime.Persistence.SqlServer` *(just the SqlServer provider)*
 - `Cirreum.Runtime.Persistence.SQLite` *(just the SQLite provider)*
+
+**Secrets / Storage**
 - `Cirreum.Runtime.Secrets` *(used internally by all others for KeyVault)*
 - `Cirreum.Runtime.Storage`
 
@@ -128,6 +158,7 @@ Optional extensions that compose lower layers and services. Allows single-call r
 <PackageReference Include="Cirreum.Runtime.Server" Version="1.0.*" />
 <PackageReference Include="Cirreum.Runtime.Secrets" Version="1.0.*" />
 <PackageReference Include="Cirreum.Runtime.Authorization" Version="1.0.*" />
+<PackageReference Include="Cirreum.Runtime.Identity" Version="1.0.*" />
 <PackageReference Include="Cirreum.Runtime.Persistence.Azure" Version="1.0.*" />
 <!-- OR -->
 <PackageReference Include="Cirreum.Runtime.Persistence.SqlServer" Version="1.0.*" />
