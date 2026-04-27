@@ -75,8 +75,8 @@ Dependency light - Cross Env/Host (Browser, Server, Serverless).
 Depends on Cirreum.Core.
 
 - `Cirreum.Graph.Provider` - Reusable MS Graph provider
-- `Cirreum.QueryCache.Distributed` - optionally provides caching for Cirreum.Core (Conductor.ICacheableQuery)
-- `Cirreum.QueryCache.Hybrid` - optionally provides caching for Cirreum.Core (Conductor.ICacheableQuery)
+- `Cirreum.QueryCache.Distributed` - optionally provides caching for Cirreum.Core (Conductor.ICacheableOperation)
+- `Cirreum.QueryCache.Hybrid` - optionally provides caching for Cirreum.Core (Conductor.ICacheableOperation)
 
 ### App Track
 Implements Cirreum.Core host-specific services, enforces patterns/conventions.

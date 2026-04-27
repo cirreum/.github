@@ -435,7 +435,7 @@ public record GetAllCustomers() : IAuthorizableRequest<IReadOnlyList<Customer>> 
 public record GetAllCustomers() : 
     IAuthorizableRequest<IReadOnlyList<Customer>>, 
     IAuditableRequest<IReadOnlyList<Customer>>, 
-    ICacheableQuery<IReadOnlyList<Customer>> {
+    ICacheableOperation<IReadOnlyList<Customer>> {
     // Caching, Auditing, Validation and Authorization handled automatically by Conductor
 }
 // -OR- consolidated Domain interface
