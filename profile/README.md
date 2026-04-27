@@ -1,14 +1,13 @@
-# Cirreum
+
+<div>
+<p align="middle">
+  <img src="https://raw.githubusercontent.com/cirreum/.github/main/profile/cirreum-icon-transparent-002.png" width="180" alt="Cirreum Logo" />
+  <br/>
+  <span style="font-size: 32px;font-weight: bold;">Cirreum</span>
+</p>
+</div>
 
 <h4>Layered simplicity for modern .NET</h4>
-
-[![FOSSA Status](https://app.fossa.com/api/projects/custom%2B59874%2FCirreum%5C.svg?type=shield&issueType=security)](https://app.fossa.com/projects/custom%2B59874%2FCirreum%5C?ref=badge_shield&issueType=security)
-
-[![FOSSA Status](https://app.fossa.com/api/projects/custom%2B59874%2FCirreum%5C.svg?type=shield&issueType=license)](https://app.fossa.com/projects/custom%2B59874%2FCirreum%5C?ref=badge_shield&issueType=license)
-
-<p align="right">
-  <img src="https://raw.githubusercontent.com/cirreum/.github/main/profile/cirreum-icon-transparent-002.png" width="180" alt="Cirreum Logo" />
-</p>
 
 ## **A modern, opinionated foundation framework built on Domain-first principles—define your models and operations once, consume them across multiple applications—with Railway-Oriented Programming ensuring clean, composable control flow throughout.**
 
@@ -20,7 +19,7 @@ Cirreum embraces **Railway-Oriented Programming** to eliminate exception-based c
 
 ```csharp
 // Write once
-public class GetResourceHandler : IRequestHandler<GetResourceQuery, ResourceDto> {
+public class GetResourceHandler : IOperationHandler<GetResourceQuery, ResourceDto> {
     public async Task<Result<ResourceDto>> Handle(GetResourceQuery query, CancellationToken ct) {
         var resource = await _repository.GetById(query.Id);
         return resource is not null
@@ -385,11 +384,7 @@ builder.Services
 
 // OpenApi (if Development)
 if (builder.Environment.IsDevelopment()) {
-    builder.Services.AddOpenApi(options => {
-        options.AddDocumentTransformer<InfoAndContactTransformer>();
-        options.AddSchemaTransformer<PropertyDescriptionTransformer>();
-        options.AddDocumentTransformer<SecuritySchemesTransformer>();
-    });
+    builder.Services.AddOpenApi();
 }
 
 // *****************************************************************************************************************************
@@ -423,15 +418,8 @@ app.MapApiEndpoints("/api/v1", api => {
 
 // OpenApi
 if (app.Environment.IsDevelopment()) {
-    app.MapOpenApi()
-        .CacheOutput();
-    app.MapScalarApiReference(options => {
-        options.DefaultFonts = false;
-        options.Layout = ScalarLayout.Modern;
-        options.OperationSorter = OperationSorter.Method;
-        options.AddPreferredSecuritySchemes("Bearer");
-        options.WithDefaultHttpClient(ScalarTarget.CSharp, ScalarClient.Curl);
-    });
+    app.MapOpenApi();
+    app.MapScalarApiReference();
 }
 
 // redirect root requests to the configured endpoint
@@ -448,19 +436,19 @@ await app.RunAsync();
 ### 3. Define a Request in your Domain library
 
 ```csharp
-public record GetAllCustomers() : IAuthorizableRequest<IReadOnlyList<Customer>> {
+public record GetAllCustomers() : IAuthorizableOperation<IReadOnlyList<Customer>> {
     // Validation and Authorization handled automatically by Conductor
 }
 // optionally if you want auditing and query caching
 public record GetAllCustomers() : 
-    IAuthorizableRequest<IReadOnlyList<Customer>>, 
-    IAuditableRequest<IReadOnlyList<Customer>>, 
+    IAuthorizableOperation<IReadOnlyList<Customer>>, 
     ICacheableOperation<IReadOnlyList<Customer>> {
-    // Caching, Auditing, Validation and Authorization handled automatically by Conductor
+    // Caching, Validation and Authorization handled automatically by Conductor
 }
-// -OR- consolidated Domain interface
-public record GetAllCustomers() : IDomainCacheableQuery<IReadOnlyList<Customer>> {
-    // Caching, Auditing, Validation and Authorization handled automatically by Conductor
+// -OR- consolidated interface
+public record GetAllCustomers() : IOwnerCacheableLookupOperation<IReadOnlyList<Customer>> {
+    // Caching, Validation and Authorization handled automatically by Conductor
+    string? OwnerId { get; set; }
 }
 ```
 
@@ -469,7 +457,7 @@ public record GetAllCustomers() : IDomainCacheableQuery<IReadOnlyList<Customer>>
 ```csharp
 public class GetAllCustomersHandler(
     IRepository<Customer> repository
-) : IRequestHandler<GetAllCustomers, IReadOnlyList<Customer>> {
+) : IOperationHandler<GetAllCustomers, IReadOnlyList<Customer>> {
     
     public async Task<Result<IReadOnlyList<Customer>>> HandleAsync(
         GetAllCustomers request,
@@ -585,7 +573,7 @@ public async Task<IActionResult> Run(
 Define authorization rules using FluentValidation-style syntax:
 
 ```csharp
-public class DeleteResourceValidator : AuthorizationValidatorBase<DeleteResourceCommand> {
+public class DeleteResourceValidator : AuthorizerBase<DeleteResourceCommand> {
     public DeleteResourceValidator() {
         RuleFor(context => context)
             .RequireRole<AdminRole>()
@@ -669,13 +657,10 @@ Cirreum is open source and welcomes contributions! Each repository has its own c
 
 ## Roadmap
 
-- [ ] Additional identity providers (more OIDC integrations beyond Entra External ID and Descope)
 - [ ] More messaging providers (RabbitMQ, AWS SNS/SQS)
 - [ ] More storage providers (AWS S3)
 - [ ] EF Core persistence provider
-- [ ] MCP-native endpoint feature
-- [ ] Performance benchmarks
-- [ ] Complete documentation site
+- [ ] A complete documentation site and developer guide
 
 ## License
 
