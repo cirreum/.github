@@ -143,29 +143,48 @@ Models define your domain's public surface area—what consumers see. Entities a
 ## Architecture Overview
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    Application Layer                         │
-│  Your handlers, queries, commands - runtime agnostic         │
-└────────────────────┬────────────────────────────────────────┘
-                     │
-                     ▼
-┌─────────────────────────────────────────────────────────────┐
-│                  Cirreum.Conductor                           │
-│  Pipeline orchestration with intercepts                      │
-│  ├─ Authorization (automatic, role-based)                    │
-│  ├─ Validation (FluentValidation integration)               │
-│  ├─ Logging, Metrics, Caching                               │
-│  └─ Custom intercepts                                        │
-└────────────────────┬────────────────────────────────────────┘
-                     │
-         ┌───────────┴───────────┬──────────────┐
-         ▼                       ▼              ▼
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│ Server          │    │ WASM            │    │ Functions       │
-│ (ASP.NET Core)  │    │ (Blazor)        │    │ (Azure)         │
-│                 │    │                 │    │                 │
-│ Result → HTTP   │    │ Result → UI     │    │ Result → JSON   │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
+              ┌─────────────────────────────────────────────────┐
+              │              Application Layer                   │
+              │  Your handlers, queries, commands                │
+              │  (runtime-agnostic, defined in your domain)      │
+              └────────────────────┬────────────────────────────┘
+                                   │
+                                   ▼
+              ┌─────────────────────────────────────────────────┐
+              │             Cirreum.Conductor                    │
+              │  Pipeline orchestration with intercepts          │
+              │  ├─ Authorization · Validation                   │
+              │  ├─ Logging · Metrics · Caching                  │
+              │  └─ Custom intercepts                            │
+              └────────────────────┬────────────────────────────┘
+                                   │
+                ┌──────────────────┼──────────────────┐
+                ▼                  ▼                  ▼
+          ┌──────────┐       ┌──────────┐       ┌──────────┐
+          │  Server  │       │Functions │       │ ACA Jobs*│
+          │  ASP.NET │       │  (Azure) │       │  (Azure) │
+          │   Core   │       │          │       │          │
+          │          │       │          │       │          │
+          │  Result  │       │  Result  │       │  Result  │
+          │  → HTTP  │       │  → JSON  │       │  → side  │
+          │          │       │          │       │   effect │
+          └─────┬────┘       └──────────┘       └──────────┘
+                │
+                │ HTTP / JSON
+                ▼
+   ┌────────────────────── Clients ──────────────────────────────┐
+   │                                                              │
+   │   ┌──────────────┐     ┌─────────────────────────────┐      │
+   │   │ Blazor WASM**│     │ React · Angular · Vue       │      │
+   │   │              │     │ Mobile · any HTTP client    │      │
+   │   │ (Cirreum-    │     │ (no Cirreum reference)      │      │
+   │   │  aware)      │     │                             │      │
+   │   └──────────────┘     └─────────────────────────────┘      │
+   └──────────────────────────────────────────────────────────────┘
+
+    * ACA Jobs uses Cirreum.Runtime.Server (no dedicated runtime package)
+   ** Blazor WASM also runs Cirreum.Conductor in-process for client-side
+      dispatch — same handlers as the server, hosted in the browser
 ```
 
 ## Library Layout
