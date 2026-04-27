@@ -173,6 +173,34 @@ Models define your domain's public surface area—what consumers see. Entities a
 └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 
+## Library Layout
+
+Cirreum is organized into consistent dependency layers and split between two tracks. The layer tells you what a package depends on; the track tells you how you consume it.
+
+### Layers (bottom to top)
+
+| Layer | Purpose | Example |
+| --------- | --------- | --------- |
+| **Base** | Zero dependencies, usable anywhere | `Cirreum.Result` |
+| **Common** | Framework-neutral, reusable across hosts | `Cirreum.Validation` |
+| **Core** | The framework spine — once you reference this, you're committed to Cirreum | `Cirreum.Core` |
+| **Services** | Host-specific glue (ASP.NET Core, WASM, Functions) | `Cirreum.Services.Server` |
+| **Runtime** | App-facing entry points (`AddX()` / `MapX()` extensions) | `Cirreum.Runtime.Server` |
+
+### Two tracks
+
+**Main track** — the framework spine. Apps reference `Cirreum.Core` + a `Cirreum.Services.{host}` + a `Cirreum.Runtime.{host}` directly. Linear dependency chain. Not pluggable.
+
+**Provider tracks** — pluggable cross-cutting services. Each provider family (Identity, Authorization, Persistence, Communications, Messaging, Storage, Secrets) follows the same shape:
+
+```
+Cirreum.{Family}Provider     # contracts & registration core
+Cirreum.{Family}.{Impl}      # concrete implementation
+Cirreum.Runtime.{Family}     # app-facing umbrella; pulls Impl transitively
+```
+
+App code installs only the `Cirreum.Runtime.{Family}` umbrella. Implementations flow in transitively, and you can swap providers without touching app code.
+
 ## Core Libraries
 
 ### 🚂 [Cirreum.Result](https://github.com/cirreum/Cirreum.Result)
@@ -194,6 +222,17 @@ Provides a complete toolkit for functional, exception‑free control flow with f
 - Ergonomic extension methods for async workflows.
 - Zero exceptions for control flow—exceptions are captured as failures.
 
+### ⚠️ [Cirreum.Exceptions](https://github.com/cirreum/Cirreum.Exceptions)
+
+Lightweight exception types designed to be captured as `Result<T>` failures rather than thrown. Pairs with `Cirreum.Result` for railway-oriented error flow.
+
+**Key Features:**
+
+- Typed exceptions for common failure modes: `NotFoundException`, `ForbiddenException`, `UnauthorizedException`, `ValidationException`, `ConflictException`, etc.
+- Implicit conversion to `Result<T>.Fail(...)`
+- RFC 7807 ProblemDetails mapping
+- Rich error metadata for HTTP response generation
+
 ### 🚂 [Cirreum.Core](https://github.com/cirreum/Cirreum.Core)
 
 #### Conductor
@@ -207,18 +246,6 @@ Request/response pipeline with intercept-based architecture. Dispatch commands a
 - Generic constraint-based registration
 - Full async/await support with cancellation
 
-#### 🔐 Cirreum.Authorization
-
-Resource-level authorization with context-base, attribute-based, and role-based access control. FluentValidation-style syntax for declaring authorization rules.
-
-**Key Features:**
-
-- Resource-specific authorization validators
-- Runtime-wide policy validators
-- Role hierarchy and inheritance
-- Automatic integration with Conductor pipeline
-- Works with any authentication provider
-
 #### ✅ Cirreum.Validation
 
 FluentValidation integration for request validation with automatic Railway conversion.
@@ -229,6 +256,38 @@ FluentValidation integration for request validation with automatic Railway conve
 - Converts validation failures to `Result.Fail()`
 - RFC 7807 ProblemDetails format
 - Custom validation rules and async validators
+
+### 🔐 [Cirreum.Authorization](https://github.com/cirreum/Cirreum.Authorization)
+
+Resource-level authorization with context-based, attribute-based, and role-based access control. FluentValidation-style syntax for declaring authorization rules. Pluggable across identity providers — provider track.
+
+**Key Features:**
+
+- Resource-specific authorization validators
+- Runtime-wide policy validators
+- Role hierarchy and inheritance
+- Automatic integration with Conductor pipeline
+- Provider-agnostic — swap identity backends without changing app code
+
+App entry point: `Cirreum.Runtime.Authorization`.
+
+### 🪪 [Cirreum.Identity](https://github.com/cirreum/Cirreum.Identity)
+
+User provisioning and identity-provider integration. Each identity provider runs as its own keyed instance with its own provisioner — multiple providers can coexist in the same app.
+
+**Supported providers:**
+
+- **OIDC** (`Cirreum.Runtime.Identity.Oidc`) — generic OpenID Connect (Auth0, Okta, Descope, Keycloak, etc.)
+- **Microsoft Entra External ID** (`Cirreum.Runtime.Identity.EntraExternalId`)
+
+**Key Features:**
+
+- Multi-tenant: register multiple providers side-by-side, keyed by config
+- Pluggable provisioning: inherit `InvitationUserProvisionerBase<T>` or `SelfServiceUserProvisionerBase<T>` — class choice IS the onboarding-mode declaration
+- Configured key (`Cirreum:Identity:Providers:{Oidc|EntraExternalId}:Instances:{key}`) auto-flows as `ProvisionContext.Source` and as the keyed DI registration
+- Footgun guards on issuer / scheme / audience misconfiguration
+
+App entry point: `Cirreum.Runtime.Identity` (umbrella) or per-protocol `Cirreum.Runtime.Identity.Oidc` / `Cirreum.Runtime.Identity.EntraExternalId`.
 
 ### 🗄️ [Cirreum.Persistence.NoSql](https://github.com/cirreum/Cirreum.Persistence.NoSql)
 
@@ -649,11 +708,11 @@ Cirreum is open source and welcomes contributions! Each repository has its own c
 
 ## Roadmap
 
-- [ ] Fix all the documentation and readme files
-- [ ] More messaging providers (RabbitMQ, AWS)
-- [ ] More storage providers (AWS, others)
-- [ ] More persistence providers (SQL based servers, EFCore)
-- [ ] Add MCP-Native Endpoints Feature
+- [ ] Additional identity providers (more OIDC integrations beyond Entra External ID and Descope)
+- [ ] More messaging providers (RabbitMQ, AWS SNS/SQS)
+- [ ] More storage providers (AWS S3)
+- [ ] EF Core persistence provider
+- [ ] MCP-native endpoint feature
 - [ ] Performance benchmarks
 - [ ] Complete documentation site
 
@@ -665,6 +724,5 @@ Cirreum is licensed under the MIT License. See individual repositories for detai
 
 - 💬 **Discussions**: [GitHub Discussions](https://github.com/orgs/cirreum/discussions)
 - 🐛 **Issues**: Report issues in the relevant repository
-- 📧 **Contact**: [Contact Information]
 
 **Built with ❤️ for the .NET community**
