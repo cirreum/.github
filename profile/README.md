@@ -5,37 +5,340 @@
 <h1 align="center">Cirreum</h1>
 <h4 align="center">Layered simplicity for modern .NET</h4>
 
-## **A modern, opinionated foundation framework built on Domain-first principles—define your models and operations once, consume them across multiple applications—with Railway-Oriented Programming ensuring clean, composable control flow throughout.**
+---
 
-Cirreum provides a comprehensive set of libraries that work seamlessly together to enable rapid development of enterprise-grade applications across Server (ASP.NET Core), Client (Blazor WebAssembly), and Serverless (Azure Functions) environments.
+## Build .NET applications once — run them across API, Blazor, and serverless hosts
+
+Cirreum is an opinionated application framework for modern .NET systems.
+
+It helps you define your domain models, operations, validation, authorization, and error-handling behavior once, then reuse that logic across:
+
+- ASP.NET Core APIs
+- Blazor WebAssembly applications
+- Azure Functions
+- background jobs and worker processes
+
+Cirreum is designed for applications where the same business logic needs to run consistently across multiple hosts without duplicating infrastructure code.
+
+---
+
+## Why Cirreum exists
+
+Modern .NET applications often spread the same logic across controllers, services, UI clients, background workers, and serverless functions.
+
+That usually leads to duplicated authorization checks, inconsistent validation, exception-heavy control flow, and different error handling in each runtime.
+
+Cirreum solves this by putting your application operations behind a shared execution pipeline.
+
+You write the operation once:
+
+```csharp
+public record GetCustomer(Guid Id) : IAuthorizableOperation<Customer>;
+
+public sealed class GetCustomerHandler(
+    IRepository<CustomerEntity> repository
+) : IOperationHandler<GetCustomer, Customer> {
+
+    public async Task<Result<Customer>> HandleAsync(
+        GetCustomer request,
+        CancellationToken cancellationToken) {
+
+        var entity = await repository.GetByIdAsync(request.Id, cancellationToken);
+
+        return entity is not null
+            ? entity.MapToCustomer()
+            : Result<Customer>.Fail(new NotFoundException("Customer not found"));
+    }
+}
+```
+
+Then dispatch it from anywhere:
+
+```csharp
+var result = await dispatcher.Dispatch(new GetCustomer(customerId), cancellationToken);
+```
+
+The same operation can be used from an API endpoint, a Blazor component, an Azure Function, or a background job.
+
+Authorization, validation, logging, caching, and error handling are applied by the pipeline instead of being repeated in every handler or endpoint.
+
+---
+
+## What Cirreum gives you
+
+- **A shared operation pipeline** for commands, queries, and application workflows
+- **Railway-Oriented Programming** with `Result` and `Result<T>`
+- **Automatic validation and authorization** through pipeline intercepts
+- **Consistent HTTP response mapping** for ASP.NET Core APIs
+- **Runtime-specific integration packages** for Server, WASM, and Serverless hosts
+- **Provider-based infrastructure** for authorization, identity, persistence, storage, messaging, secrets, email, and SMS
+- **Clean domain separation** between public models, application operations, handlers, and persistence entities
+
+---
+
+## Who Cirreum is for
+
+Cirreum is built for developers and teams creating structured .NET applications with more than one runtime or host.
+
+It is especially useful when you are building:
+
+- APIs with shared domain operations
+- Blazor WebAssembly applications backed by ASP.NET Core
+- systems with multiple identity providers
+- applications with app-managed roles and authorization rules
+- modular platforms made from many NuGet packages
+- serverless or background-processing workflows that reuse the same business logic as the API
+
+Cirreum is not trying to replace ASP.NET Core, Blazor, Azure Functions, or the .NET host model.
+
+It sits on top of them and gives your application a consistent domain-first execution model.
+
+---
+
+## Core ideas
+
+### One domain model
+
+Your domain project defines the public shape of your application:
+
+- models
+- commands
+- queries
+- validators
+- authorizers
+- operation contracts
+
+The domain does not depend on infrastructure.
+
+### One execution pipeline
+
+Operations are dispatched through Cirreum Conductor.
+
+The pipeline can apply:
+
+- validation
+- authorization
+- logging
+- metrics
+- caching
+- error handling
+- custom intercepts
+
+### Multiple runtimes
+
+The same operation can be consumed from different hosts:
+
+- ASP.NET Core maps `Result<T>` to HTTP responses
+- Blazor WASM can dispatch operations in-process
+- Azure Functions can reuse the same handlers and result semantics
+- background workers can execute the same domain workflows
+
+### Explicit success and failure
+
+Cirreum uses Railway-Oriented Programming to make success and failure part of the type system.
+
+Instead of throwing exceptions for expected application outcomes, handlers return `Result` or `Result<T>`.
+
+```csharp
+return customer is not null
+    ? Result<Customer>.Success(customer)
+    : Result<Customer>.Fail(new NotFoundException("Customer not found"));
+```
+
+---
+
+## Quick start
+
+Install the server runtime package:
+
+```bash
+dotnet add package Cirreum.Runtime.Server
+```
+
+Create a Cirreum application:
+
+```csharp
+var builder = DomainApplication.CreateBuilder(args);
+
+builder.AddAuthorization();
+
+await using var app = builder.Build<MyDomainMarker>();
+
+app.UseDefaultMiddleware();
+
+app.MapApiEndpoints("/api/v1", api => {
+    api.MapGet("/customers/{id}", static async (
+        Guid id,
+        IDispatcher dispatcher,
+        CancellationToken cancellationToken) =>
+            await dispatcher.Dispatch(new GetCustomer(id), cancellationToken));
+});
+
+await app.RunAsync();
+```
+
+Define an operation:
+
+```csharp
+public record GetCustomer(Guid Id) : IAuthorizableOperation<Customer>;
+```
+
+Implement a handler:
+
+```csharp
+public sealed class GetCustomerHandler(
+    IRepository<CustomerEntity> repository
+) : IOperationHandler<GetCustomer, Customer> {
+
+    public async Task<Result<Customer>> HandleAsync(
+        GetCustomer request,
+        CancellationToken cancellationToken) {
+
+        var entity = await repository.GetByIdAsync(request.Id, cancellationToken);
+
+        return entity is not null
+            ? entity.MapToCustomer()
+            : Result<Customer>.Fail(new NotFoundException("Customer not found"));
+    }
+}
+```
+
+That operation can now flow through validation, authorization, result handling, and HTTP response mapping without duplicating that logic in the endpoint.
+
+---
+
+## Example: Result-to-HTTP mapping
+
+A handler returns a domain result:
+
+```csharp
+return Result<Customer>.Fail(new NotFoundException("Customer not found"));
+```
+
+The server runtime maps it to the correct HTTP response:
+
+```http
+404 Not Found
+```
+
+Validation failures can become:
+
+```http
+422 Unprocessable Entity
+```
+
+Authorization failures can become:
+
+```http
+403 Forbidden
+```
+
+Successful results become:
+
+```http
+200 OK
+```
+
+The handler does not need to know it is running behind HTTP.
+
+---
+
+## Package families
+
+Cirreum is split into small packages so applications can take only what they need.
+
+### Main runtime packages
+
+| Package | Purpose |
+| ------- | ------- |
+| `Cirreum.Core` | Conductor pipeline, dispatcher, operation contracts, intercepts |
+| `Cirreum.Runtime.Server` | ASP.NET Core host integration |
+| `Cirreum.Runtime.Wasm` | Blazor WebAssembly integration |
+| `Cirreum.Runtime.Serverless` | Azure Functions integration |
+
+### Common provider families
+
+| Family | Purpose |
+| ------ | ------- |
+| Authorization | OIDC, Entra, API key, signed request, external JWT |
+| Identity | user provisioning and identity-provider integration |
+| Persistence | Cosmos DB, SQL Server, SQLite, provider abstractions |
+| Storage | blob and browser storage abstractions |
+| Messaging | queues and pub/sub abstractions |
+| Communications | email and SMS abstractions |
+| Secrets | secret-provider integration |
+
+Applications typically reference the runtime package for the host they are building, plus the provider packages they need.
+
+For the full repo-by-repo catalog, see [Full Library Catalog](#full-library-catalog) below.
+
+---
 
 ## Philosophy
 
-Cirreum embraces **Railway-Oriented Programming** to eliminate exception-based control flow while maintaining clean, composable code. Write your business logic once, and run it anywhere—with authorization, validation, and error handling automatically applied through a powerful pipeline architecture.
+Cirreum is built around a few principles:
 
-```csharp
-// Write once
-public class GetResourceHandler : IOperationHandler<GetResourceQuery, ResourceDto> {
-    public async Task<Result<ResourceDto>> Handle(GetResourceQuery query, CancellationToken ct) {
-        var resource = await _repository.GetById(query.Id);
-        return resource is not null
-            ? Result<ResourceDto>.Success(resource)
-            : Result<ResourceDto>.Fail(new NotFoundException("Resource not found"));
-    }
-}
+- business logic should not depend on the host
+- expected failures should be explicit, not exception-driven
+- authorization and validation should be centralized
+- infrastructure should be replaceable
+- applications should be composed from small, focused packages
+- defaults should be useful, but not restrictive
 
-// Run everywhere - Server returns HTTP 200/404, WASM updates UI, Functions map to IActionResult
-await dispatcher.Dispatch(new GetResourceQuery(id), cancellationToken);
+The goal is not to hide .NET.
+
+The goal is to give large .NET applications a consistent foundation.
+
+---
+
+## Architecture Overview
+
+```
+              ┌─────────────────────────────────────────────────┐
+              │              Application Layer                   │
+              │  Your handlers, queries, commands                │
+              │  (runtime-agnostic, defined in your domain)      │
+              └────────────────────┬────────────────────────────┘
+                                   │
+                                   ▼
+              ┌─────────────────────────────────────────────────┐
+              │             Cirreum.Conductor                    │
+              │  Pipeline orchestration with intercepts          │
+              │  ├─ Authorization · Validation                   │
+              │  ├─ Logging · Metrics · Caching                  │
+              │  └─ Custom intercepts                            │
+              └────────────────────┬────────────────────────────┘
+                                   │
+                ┌──────────────────┼──────────────────┐
+                ▼                  ▼                  ▼
+          ┌──────────┐       ┌──────────┐       ┌──────────┐
+          │  Server  │       │Functions │       │ ACA Jobs*│
+          │  ASP.NET │       │  (Azure) │       │  (Azure) │
+          │   Core   │       │          │       │          │
+          │          │       │          │       │          │
+          │  Result  │       │  Result  │       │  Result  │
+          │  → HTTP  │       │  → JSON  │       │  → side  │
+          │          │       │          │       │   effect │
+          └─────┬────┘       └──────────┘       └──────────┘
+                │
+                │ HTTP / JSON
+                ▼
+   ┌────────────────────── Clients ──────────────────────────────┐
+   │                                                              │
+   │   ┌──────────────┐     ┌─────────────────────────────┐      │
+   │   │ Blazor WASM**│     │ React · Angular · Vue       │      │
+   │   │              │     │ Mobile · any HTTP client    │      │
+   │   │ (Cirreum-    │     │ (no Cirreum reference)      │      │
+   │   │  aware)      │     │                             │      │
+   │   └──────────────┘     └─────────────────────────────┘      │
+   └──────────────────────────────────────────────────────────────┘
+
+    * ACA Jobs uses Cirreum.Runtime.Server (no dedicated runtime package)
+   ** Blazor WASM also runs Cirreum.Conductor in-process for client-side
+      dispatch — same handlers as the server, hosted in the browser
 ```
 
-## Core Principles
-
-- **Runtime-Agnostic**: Business logic works identically across Server, Client, and Serverless runtimes
-- **Railway-Oriented**: Explicit success/failure paths with `Result<T>` instead of exceptions
-- **Convention over Configuration**: Sensible defaults with escape hatches when needed
-- **Type-Safe**: Leverage C#'s type system for compile-time safety
-- **Composable**: Small, focused libraries that work better together
-- **Clean Architecture**: Clear separation between business logic and infrastructure concerns
+---
 
 ## Project Structure
 
@@ -140,52 +443,7 @@ src/
 
 Models define your domain's public surface area—what consumers see. Entities are implementation details of how data is stored. Handlers bridge the two with explicit mapping, keeping your domain clean and your persistence flexible.
 
-## Architecture Overview
-
-```
-              ┌─────────────────────────────────────────────────┐
-              │              Application Layer                   │
-              │  Your handlers, queries, commands                │
-              │  (runtime-agnostic, defined in your domain)      │
-              └────────────────────┬────────────────────────────┘
-                                   │
-                                   ▼
-              ┌─────────────────────────────────────────────────┐
-              │             Cirreum.Conductor                    │
-              │  Pipeline orchestration with intercepts          │
-              │  ├─ Authorization · Validation                   │
-              │  ├─ Logging · Metrics · Caching                  │
-              │  └─ Custom intercepts                            │
-              └────────────────────┬────────────────────────────┘
-                                   │
-                ┌──────────────────┼──────────────────┐
-                ▼                  ▼                  ▼
-          ┌──────────┐       ┌──────────┐       ┌──────────┐
-          │  Server  │       │Functions │       │ ACA Jobs*│
-          │  ASP.NET │       │  (Azure) │       │  (Azure) │
-          │   Core   │       │          │       │          │
-          │          │       │          │       │          │
-          │  Result  │       │  Result  │       │  Result  │
-          │  → HTTP  │       │  → JSON  │       │  → side  │
-          │          │       │          │       │   effect │
-          └─────┬────┘       └──────────┘       └──────────┘
-                │
-                │ HTTP / JSON
-                ▼
-   ┌────────────────────── Clients ──────────────────────────────┐
-   │                                                              │
-   │   ┌──────────────┐     ┌─────────────────────────────┐      │
-   │   │ Blazor WASM**│     │ React · Angular · Vue       │      │
-   │   │              │     │ Mobile · any HTTP client    │      │
-   │   │ (Cirreum-    │     │ (no Cirreum reference)      │      │
-   │   │  aware)      │     │                             │      │
-   │   └──────────────┘     └─────────────────────────────┘      │
-   └──────────────────────────────────────────────────────────────┘
-
-    * ACA Jobs uses Cirreum.Runtime.Server (no dedicated runtime package)
-   ** Blazor WASM also runs Cirreum.Conductor in-process for client-side
-      dispatch — same handlers as the server, hosted in the browser
-```
+---
 
 ## Library Layout
 
@@ -215,9 +473,9 @@ Cirreum.Runtime.{Family}     # app-facing umbrella; pulls Impl transitively  (Ru
 
 App code installs only the `Cirreum.Runtime.{Family}` umbrella. Implementations flow in transitively, and you can swap providers without touching app code.
 
-The full repo catalog below is organized by folder (each folder is a layer).
+---
 
-## Library Catalog
+## Full Library Catalog
 
 Every published Cirreum repo, organized by folder. Each folder is a layer; within a layer, a package is either part of the **main track** (the linear framework spine) or a **provider track** (a pluggable service family).
 
@@ -343,146 +601,7 @@ Every published Cirreum repo, organized by folder. Each folder is a layer; withi
 | [Cirreum.Runtime.Wasm.Msal](https://github.com/cirreum/Cirreum.Runtime.Wasm.Msal) | Identity (WASM) | WASM client identity flows via MSAL (Entra workforce / B2C). |
 | [Cirreum.Runtime.Wasm.Oidc](https://github.com/cirreum/Cirreum.Runtime.Wasm.Oidc) | Identity (WASM) | WASM client identity flows via generic OIDC. |
 
-## Quick Start
-
-### 1. Install Packages
-
-```bash
-dotnet add package Cirreum.Runtime.Server
-dotnet add package Cirreum.Runtime.Secrets // Typical
-dotnet add package Cirreum.Runtime.Authorization // Typical
-dotnet add package Cirreum.Runtime.Persistence.Azure // Optional
-dotnet add package Cirreum.Runtime.Persistence.SQLite // Optional
-dotnet add package Cirreum.Runtime.Persistence.SqlServer // Optional
-dotnet add package Cirreum.Runtime.Communications // Optional
-dotnet add package Cirreum.Runtime.Storage // Optional
-```
-
-### 2. Configure Services
-
-```csharp
-// Program.cs
-// ******************************************************************************
-// Configure the DomainApplication
-//
-var builder = DomainApplication
-    .CreateBuilder(args);
-
-
-// ******************************************************************************
-// Add application secrets
-//
-builder.AddSecrets();
-
-
-// ******************************************************************************
-// Add Authentication/Authorization
-//
-builder.AddAuthorization();
-
-
-// ******************************************************************************
-// Add Services to the DomainApplication
-//
-
-// Cirreum based service providers
-builder
-    .AddPersistence()
-    .AddStorage()
-    .AddMessaging()
-    .AddEmailServices()
-    .AddSmsServices();
-
-// Your local Services
-builder.Services
-    .AddScoped<IMyService, MyService>();
-
-// OpenApi (if Development)
-if (builder.Environment.IsDevelopment()) {
-    builder.Services.AddOpenApi();
-}
-
-// *****************************************************************************************************************************
-// Build the DomainApplication, referencing your referenced domain library (includes overrloads for multi-library scanning)
-//
-await using var app = builder.Build<MyDomainTypeInReferenceLib>();
-
-
-// *****************************************************************************************************************************
-// Use the default Middleware
-//
-app.UseDefaultMiddleware();
-
-
-// ******************************************************************************
-// Map Endpoints
-//
-
-// HealthCheck Endpoints
-app.MapDefaultHealthChecks();
-
-// Map Feature Endpoints (Application API)
-app.MapApiEndpoints("/api/v1", api => {
-    // [Static Class] CustomersApi.MapEndpoints(api);
-    // [Static Inline] api.MapGet("/customers", Customers.GetAll);
-    // [Inline]
-    api.MapGet("/customers", static async (IDispatcher dispatcher, CancellationToken token) =>
-      dispatcher.Dispatch(new GetAllCustomers(), token) 
-    );
-});
-
-// OpenApi
-if (app.Environment.IsDevelopment()) {
-    app.MapOpenApi();
-    app.MapScalarApiReference();
-}
-
-// redirect root requests to the configured endpoint
-app.UseLandingPage();
-
-
-// *****************************************************************************************************************************
-// Run the DomainApplication...
-//
-await app.RunAsync();
-
-```
-
-### 3. Define a Request in your Domain library
-
-```csharp
-public record GetAllCustomers() : IAuthorizableOperation<IReadOnlyList<Customer>> {
-    // Validation and Authorization handled automatically by Conductor
-}
-// optionally if you want auditing and query caching
-public record GetAllCustomers() : 
-    IAuthorizableOperation<IReadOnlyList<Customer>>, 
-    ICacheableOperation<IReadOnlyList<Customer>> {
-    // Caching, Validation and Authorization handled automatically by Conductor
-}
-// -OR- consolidated interface
-public record GetAllCustomers() : IOwnerCacheableLookupOperation<IReadOnlyList<Customer>> {
-    // Caching, Validation and Authorization handled automatically by Conductor
-    string? OwnerId { get; set; }
-}
-```
-
-### 4. Implement the Handler in your Infrastructure or Server library
-
-```csharp
-public class GetAllCustomersHandler(
-    IRepository<Customer> repository
-) : IOperationHandler<GetAllCustomers, IReadOnlyList<Customer>> {
-    
-    public async Task<Result<IReadOnlyList<Customer>>> HandleAsync(
-        GetAllCustomers request,
-        CancellationToken cancellationToken) =>
-            await _repository.GetAll(cancellationToken);
-    }
-}
-```
-
-That's it! Authorization is enforced automatically, validation runs through the pipeline, and the `Result<T>` is converted to the appropriate HTTP response (200 OK, 403 Forbidden, 422 Unprocessable Entity, etc.).
+---
 
 ## Railway-Oriented Programming
 
@@ -507,7 +626,7 @@ public async Task<ResourceDto> GetResource(string id) {
 }
 
 // Cirreum approach (no-throw)
-public async Task<Result<Resource>> Handle(GetResourceQuery query, CancellationToken ct) {
+public async Task<Result<Resource>> HandleAsync(GetResourceQuery query, CancellationToken ct) {
     var entity = await _repository.GetById(query.Id, ct);
 
     // Implicit-cast for simple case
@@ -529,7 +648,7 @@ public async Task<Result<Resource>> Handle(GetResourceQuery query, CancellationT
 Chain operations with `Map`, `Then`, and `Where`:
 
 ```csharp
-public async Task<Result<InvoiceDto>> Handle(CreateInvoiceCommand cmd, CancellationToken ct) {
+public async Task<Result<InvoiceDto>> HandleAsync(CreateInvoiceCommand cmd, CancellationToken ct) {
     return await GetCustomer(cmd.CustomerId)
         .Then(customer => ValidateCredit(customer))
         .Map(customer => CreateInvoice(customer, cmd.Items))
@@ -540,60 +659,19 @@ public async Task<Result<InvoiceDto>> Handle(CreateInvoiceCommand cmd, Cancellat
 
 See [Cirreum.Result](https://github.com/cirreum/Cirreum.Result) and [Cirreum.Exceptions](https://github.com/cirreum/Cirreum.Exceptions) for more details.
 
-## Multi-Runtime Support
-
-### Server (ASP.NET Core)
-
-```csharp
-[HttpGet("{id}")]
-public async Task<Result<ResourceDto>> Get(string id) {
-    return await _dispatcher.Dispatch(new GetResourceQuery(id));
-}
-```
-
-### WASM (Blazor)
-
-```csharp
-private async Task LoadResource() {
-    var result = await Dispatcher.Dispatch(new GetResourceQuery(ResourceId));
-    
-    result.Switch(
-        onSuccess: value => {
-            Resource = value;
-            StateHasChanged();
-        },
-        onFailure: error => ErrorMessage = error.Message
-    );
-}
-```
-
-### Functions (Azure)
-
-```csharp
-[Function("GetResource")]
-public async Task<IActionResult> Run(
-    [HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequest req) {
-    
-    var result = await _dispatcher.Dispatch(new GetResourceQuery(req.Query["id"]));
-    
-    return result.Match(
-        onSuccess: value => new OkObjectResult(value),
-        onFailure: error => new ObjectResult(error) { StatusCode = 500 }
-    );
-}
-```
+---
 
 ## Authorization Example
 
 Define authorization rules using FluentValidation-style syntax:
 
 ```csharp
-public class DeleteResourceValidator : AuthorizerBase<DeleteResourceCommand> {
-    public DeleteResourceValidator() {
+public class DeleteResourceAuthorizer : AuthorizerBase<DeleteResourceCommand> {
+    public DeleteResourceAuthorizer() {
         RuleFor(context => context)
             .RequireRole<AdminRole>()
             .WithMessage("Only administrators can delete resources");
-            
+
         RuleFor(context => context.Resource.Id)
             .MustAsync(async (id, ctx, ct) => {
                 var resource = await GetResource(id);
@@ -604,71 +682,57 @@ public class DeleteResourceValidator : AuthorizerBase<DeleteResourceCommand> {
 }
 ```
 
-The authorization runs automatically through the Conductor pipeline—no need to call it explicitly in your handler.
+The authorization runs automatically through the Conductor pipeline — no need to call it explicitly in your handler.
 
-## HTTP Response Examples
+---
 
-### Success (200 OK)
+## Multi-Runtime Support
 
-```json
-{
-  "id": "123",
-  "name": "Resource Name",
-  "createdAt": "2025-11-13T10:30:00Z"
+The same operation can be dispatched from any host. The handler doesn't change; only the host wiring around it does.
+
+### Server (ASP.NET Core)
+
+```csharp
+api.MapGet("/customers/{id}", static async (
+    Guid id,
+    IDispatcher dispatcher,
+    CancellationToken ct) =>
+        await dispatcher.Dispatch(new GetCustomer(id), ct));
+```
+
+### WASM (Blazor)
+
+```csharp
+private async Task LoadCustomer() {
+    var result = await Dispatcher.Dispatch(new GetCustomer(CustomerId));
+
+    result.Switch(
+        onSuccess: value => {
+            Customer = value;
+            StateHasChanged();
+        },
+        onFailure: error => ErrorMessage = error.Message
+    );
 }
 ```
 
-### Validation Error (422 Unprocessable Entity)
+### Functions (Azure)
 
-```json
-{
-  "type": "https://tools.ietf.org/html/rfc9110#section-15.5.21",
-  "title": "Unprocessable Entity",
-  "status": 422,
-  "detail": "Validation failed",
-  "instance": "/api/resources",
-  "failures": [
-    {
-      "propertyName": "Name",
-      "errorMessage": "Name is required",
-      "errorCode": "NotEmptyValidator",
-      "severity": "Error"
-    }
-  ]
+```csharp
+[Function("GetCustomer")]
+public async Task<IActionResult> Run(
+    [HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequest req) {
+
+    var result = await _dispatcher.Dispatch(new GetCustomer(Guid.Parse(req.Query["id"])));
+
+    return result.Match(
+        onSuccess: value => new OkObjectResult(value),
+        onFailure: error => new ObjectResult(error) { StatusCode = 500 }
+    );
 }
 ```
 
-### Authorization Error (403 Forbidden)
-
-```json
-{
-  "type": "https://tools.ietf.org/html/rfc9110#section-15.5.4",
-  "title": "Forbidden",
-  "status": 403,
-  "detail": "User 'john@example.com' lacks permission 'resource:delete'",
-  "instance": "/api/resources/123"
-}
-```
-
-## Why Cirreum?
-
-| Feature | Traditional ASP.NET | MediatR | Cirreum |
-| --------- | --------------------- | --------- | --------- |
-| Railway-Oriented | ❌ | ❌ | ✅ |
-| Runtime-Agnostic | ❌ | ✅ | ✅ |
-| Auto Authorization | ❌ | ❌ | ✅ |
-| Auto HTTP Conversion | ❌ | ❌ | ✅ |
-| Consistent Error Format | ❌ | ❌ | ✅ |
-| Built-in Validation | ❌ | ❌ | ✅ |
-
-## Contributing
-
-Cirreum is open source and welcomes contributions! Each repository has its own contribution guidelines, but here are some general principles:
-
-- Follow existing code style and conventions
-- Include unit tests for new features
-- Update documentation for user-facing changes
-- Keep PRs focused on a single concern
+---
 
 ## Roadmap
 
@@ -677,9 +741,24 @@ Cirreum is open source and welcomes contributions! Each repository has its own c
 - [ ] EF Core persistence provider
 - [ ] A complete documentation site and developer guide
 
+---
+
+## Contributing
+
+Cirreum is open source and welcomes contributions. Each repository has its own contribution guidelines, but here are some general principles:
+
+- Follow existing code style and conventions
+- Include unit tests for new features
+- Update documentation for user-facing changes
+- Keep PRs focused on a single concern
+
+---
+
 ## License
 
 Cirreum is licensed under the MIT License. See individual repositories for details.
+
+---
 
 ## Support
 
