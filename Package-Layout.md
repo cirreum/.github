@@ -54,6 +54,7 @@ Dependency light - Cross Env/Host (Browser, Server, Serverless).
 ### Provider Track
 - `Cirreum.AuthorizationProvider` - extends Cirreum.Providers
 - `Cirreum.IdentityProvider` - extends Cirreum.Providers
+- `Cirreum.InvocationProvider` - extends Cirreum.Providers; foundational seam for inbound invocation sources (HTTP, SignalR, raw WebSocket, gRPC streaming) — `IInvocationContext`, `IInvocationConnection`, registrar base
 - `Cirreum.SecretsProvider` - extends Cirreum.Providers
 - `Cirreum.ServiceProvider` - extends Cirreum.Providers
 
@@ -74,6 +75,10 @@ Dependency light - Cross Env/Host (Browser, Server, Serverless).
 **Identity**
 - `Cirreum.Identity.EntraExternalId` - extends Cirreum.IdentityProvider
 - `Cirreum.Identity.Oidc` - extends Cirreum.IdentityProvider
+
+**Invocation** (long-lived dispatch sources — HTTP is the framework default and lives in `Cirreum.Services.Server`)
+- `Cirreum.Invocation.SignalR` - extends Cirreum.InvocationProvider; SignalR Hubs as a Cirreum invocation source
+- `Cirreum.Invocation.WebSockets` - extends Cirreum.InvocationProvider; raw WebSocket endpoints as a Cirreum invocation source
 
 **Communications**
 - `Cirreum.Communications.Email.Azure` - extends Cirreum.Communications.Email and Cirreum.ServiceProvider
@@ -112,6 +117,7 @@ Hosting implementation.
 ### Provider Track
 - `Cirreum.Runtime.AuthorizationProvider`
 - `Cirreum.Runtime.IdentityProvider`
+- `Cirreum.Runtime.InvocationProvider` - `IInvocationBuilder`, `RegisterInvocationProvider<>` helper, `InvocationProviderMapping`
 - `Cirreum.Runtime.SecretsProvider`
 - `Cirreum.Runtime.ServiceProvider`
 
@@ -135,6 +141,11 @@ Optional extensions that compose lower layers and services. Allows single-call r
 - `Cirreum.Runtime.Identity.EntraExternalId` *(Microsoft Entra External ID)*
 - `Cirreum.Runtime.Wasm.Msal` *(WASM client identity flows via MSAL — Entra workforce / B2C)*
 - `Cirreum.Runtime.Wasm.Oidc` *(WASM client identity flows via generic OIDC)*
+
+**Invocation** *(unified `AddInvocation()` / `MapInvocation()` for long-lived dispatch sources alongside the framework-default HTTP)*
+- `Cirreum.Runtime.Invocation` *(cross-source invocation umbrella)*
+- `Cirreum.Runtime.Invocation.SignalR` *(SignalR Hubs)*
+- `Cirreum.Runtime.Invocation.WebSockets` *(raw WebSocket endpoints; provider-level `WebSocketOptions` + per-instance handlers)*
 
 **Communications / Messaging**
 - `Cirreum.Runtime.Communications` *(SMS and Email)*
