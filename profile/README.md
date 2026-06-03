@@ -55,7 +55,7 @@ public sealed class GetCustomerHandler(
 Then dispatch it from anywhere:
 
 ```csharp
-var result = await dispatcher.Dispatch(new GetCustomer(customerId), cancellationToken);
+var result = await dispatcher.DispatchAsync(new GetCustomer(customerId), cancellationToken);
 ```
 
 The same operation can be used from an API endpoint, a Blazor component, an Azure Function, or a background job.
@@ -161,7 +161,7 @@ Create a Cirreum application:
 ```csharp
 var builder = DomainApplication.CreateBuilder(args);
 
-builder.AddAuthorization();
+builder.AddAuthentication();
 
 await using var app = builder.Build<MyDomainMarker>();
 
@@ -172,7 +172,7 @@ app.MapApiEndpoints("/api/v1", api => {
         Guid id,
         IDispatcher dispatcher,
         CancellationToken cancellationToken) =>
-            await dispatcher.Dispatch(new GetCustomer(id), cancellationToken));
+            await dispatcher.DispatchAsync(new GetCustomer(id), cancellationToken));
 });
 
 await app.RunAsync();
@@ -252,7 +252,7 @@ Cirreum is split into small packages so applications can take only what they nee
 
 | Package | Purpose |
 | ------- | ------- |
-| `Cirreum.Core` | Conductor pipeline, dispatcher, operation contracts, intercepts |
+| `Cirreum.Kernel` / `Cirreum.Common` / `Cirreum.Shared` | Foundation — contracts, the Conductor pipeline, and cross-host implementations (pulled in transitively) |
 | `Cirreum.Runtime.Server` | ASP.NET Core host integration |
 | `Cirreum.Runtime.Wasm` | Blazor WebAssembly integration |
 | `Cirreum.Runtime.Serverless` | Azure Functions integration |
@@ -261,16 +261,15 @@ Cirreum is split into small packages so applications can take only what they nee
 
 | Family | Purpose |
 | ------ | ------- |
-| Authorization | OIDC, Entra, API key, signed request, external JWT |
+| Authentication | OIDC, Entra, API key, signed request, external JWT, session ticket |
 | Identity | user provisioning and identity-provider integration |
-| Invocation | long-lived dispatch sources alongside the framework-default HTTP — SignalR Hubs and raw WebSocket endpoints |
 | Persistence | Cosmos DB, SQL Server, SQLite, provider abstractions |
 | Storage | blob and browser storage abstractions |
 | Messaging | queues and pub/sub abstractions |
 | Communications | email and SMS abstractions |
 | Secrets | secret-provider integration |
 
-Applications typically reference the runtime package for the host they are building, plus the provider packages they need.
+Applications typically reference the runtime package for the host they are building, plus the provider packages they need. SignalR Hubs and raw WebSocket endpoints are supported directly by the server runtime as additional invocation sources — the same Conductor handlers run across HTTP, SignalR, and WebSocket.
 
 For the full repo-by-repo catalog, see [Full Library Catalog](#full-library-catalog) below.
 
@@ -455,22 +454,23 @@ Cirreum is organized into consistent dependency layers and split between two tra
 
 | Layer | Purpose | Example |
 | --------- | --------- | --------- |
-| **Base** | Zero dependencies, usable anywhere | `Cirreum.Result` |
-| **Common** | Framework-neutral, reusable across hosts | `Cirreum.Validation` |
-| **Core** | The framework spine — once you reference this, you're committed to Cirreum | `Cirreum.Core` |
-| **Services** | Host-specific glue (ASP.NET Core, WASM, Functions) | `Cirreum.Services.Server` |
-| **Runtime** | App-facing entry points (`AddX()` / `MapX()` extensions) | `Cirreum.Runtime.Server` |
+| **Base** | Zero dependencies, usable anywhere | `Cirreum.Result`, `Cirreum.Kernel` |
+| **Common** | Framework-neutral, reusable across hosts | `Cirreum.Common` |
+| **Core** | The framework spine — once you reference this, you're committed to Cirreum | `Cirreum.Shared` |
+| **Infrastructure** | Host services + provider implementations | `Cirreum.Services.Server` |
+| **Runtime** | Host wiring + provider runtime cores | `Cirreum.Runtime.Server` |
+| **Runtime Extensions** | App-facing entry points (`AddX()` / `MapX()` extensions) | `Cirreum.Runtime.Authentication` |
 
 ### Two tracks
 
-**Main track** — the framework spine. Apps reference `Cirreum.Core` + a `Cirreum.Services.{host}` + a `Cirreum.Runtime.{host}` directly. Linear dependency chain. Not pluggable.
+**Main track** — the framework spine: `Cirreum.Kernel` → `Cirreum.Common` → `Cirreum.Shared` → a `Cirreum.Services.{host}` → a `Cirreum.Runtime.{host}`. Apps reference the foundation plus their host's services and runtime. Linear dependency chain. Not pluggable.
 
-**Provider tracks** — pluggable cross-cutting services. Each provider family (Authorization, Identity, Persistence, Communications, Messaging, Storage, Secrets) follows the same shape:
+**Provider tracks** — pluggable cross-cutting services. Each provider family (Authentication, Identity, Persistence, Communications, Messaging, Storage, Secrets) follows the same shape — a contracts/abstractions package, one or more implementations, and an app-facing umbrella:
 
 ```
-Cirreum.{Family}Provider     # contracts & registration core      (Core/)
-Cirreum.{Family}.{Impl}      # concrete implementation             (Infrastructure/)
-Cirreum.Runtime.{Family}     # app-facing umbrella; pulls Impl transitively  (Runtime Extensions/)
+Cirreum.{Family} or Cirreum.{Family}Provider   # contracts & abstractions   (Common/ or Core/)
+Cirreum.{Family}.{Impl}                         # concrete implementation    (Infrastructure/)
+Cirreum.Runtime.{Family}                        # app-facing umbrella; pulls the impl transitively   (Runtime Extensions/)
 ```
 
 App code installs only the `Cirreum.Runtime.{Family}` umbrella. Implementations flow in transitively, and you can swap providers without touching app code.
@@ -479,7 +479,7 @@ App code installs only the `Cirreum.Runtime.{Family}` umbrella. Implementations 
 
 ## Full Library Catalog
 
-Every published Cirreum repo, organized by folder. Each folder is a layer; within a layer, a package is either part of the **main track** (the linear framework spine) or a **provider track** (a pluggable service family).
+Every Cirreum repo, organized by folder. Each folder is a layer; within a layer, a package is either part of the **main track** (the linear framework spine) or a **provider track** (a pluggable service family).
 
 ### Base — zero dependencies
 
@@ -487,17 +487,20 @@ Every published Cirreum repo, organized by folder. Each folder is a layer; withi
 | --------- | ------- | ------------- |
 | [Cirreum.Result](https://github.com/cirreum/Cirreum.Result) | main | Struct-based, allocation-free `Result` / `Result<T>` monad with full async support and monadic composition (Map, Then, Ensure, Match, Switch). |
 | [Cirreum.Exceptions](https://github.com/cirreum/Cirreum.Exceptions) | main | Typed exception hierarchy (`NotFoundException`, `ForbiddenException`, `ValidationException`, …) designed to be captured as `Result<T>.Fail(...)`. RFC 7807 ProblemDetails mapping. |
+| [Cirreum.Kernel](https://github.com/cirreum/Cirreum.Kernel) | main | Foundational cross-host abstractions, contracts, value types, and the framework bootstrap surface. |
 
 ### Common — framework-neutral, host-agnostic abstractions
 
 | Package | Track | Description |
 | --------- | ------- | ------------- |
+| [Cirreum.Common](https://github.com/cirreum/Cirreum.Common) | main | Cross-host primitives — Conductor (CQRS), caching, state, presence, remote services, file system, and the authorization vocabulary. |
 | [Cirreum.Communications.Email](https://github.com/cirreum/Cirreum.Communications.Email) | Communications | Email sender contracts and templates. |
 | [Cirreum.Communications.Sms](https://github.com/cirreum/Cirreum.Communications.Sms) | Communications | SMS sender contracts and templates. |
 | [Cirreum.Cors](https://github.com/cirreum/Cirreum.Cors) | main | CORS configuration helpers. |
 | [Cirreum.ExpressionBuilder](https://github.com/cirreum/Cirreum.ExpressionBuilder) | main | Dynamic LINQ expression-tree utilities. |
 | [Cirreum.Logging.Deferred](https://github.com/cirreum/Cirreum.Logging.Deferred) | main | Deferred / batched logging primitives. |
 | [Cirreum.Messaging](https://github.com/cirreum/Cirreum.Messaging) | Messaging | Message queue / pub-sub abstractions. |
+| [Cirreum.Messaging.Distributed](https://github.com/cirreum/Cirreum.Messaging.Distributed) | Messaging | Distributed message-envelope abstractions for cross-process fan-out. |
 | [Cirreum.Persistence.NoSql](https://github.com/cirreum/Cirreum.Persistence.NoSql) | Persistence | Document-database repository + unit-of-work abstractions. |
 | [Cirreum.Persistence.Sql](https://github.com/cirreum/Cirreum.Persistence.Sql) | Persistence | SQL repository abstractions built on Dapper. |
 | [Cirreum.Providers](https://github.com/cirreum/Cirreum.Providers) | infra | Provider-pattern plumbing shared across all provider tracks. |
@@ -509,26 +512,26 @@ Every published Cirreum repo, organized by folder. Each folder is a layer; withi
 
 | Package | Track | Description |
 | --------- | ------- | ------------- |
-| [Cirreum.Core](https://github.com/cirreum/Cirreum.Core) | main | Conductor pipeline (`IDispatcher`, intercepts), validation, the framework spine. |
+| [Cirreum.Shared](https://github.com/cirreum/Cirreum.Shared) | main | Cross-host spine implementations — Conductor dispatcher/publisher, caching, state, presence, and the authorization-pillar implementations. |
 | [Cirreum.Components.WebAssembly](https://github.com/cirreum/Cirreum.Components.WebAssembly) | main | Reusable Blazor components (TreeView, DataGrid, forms) with multi-theme support. |
-| [Cirreum.AuthorizationProvider](https://github.com/cirreum/Cirreum.AuthorizationProvider) | Authorization (core) | Provider contracts and registration for authorization. |
+| [Cirreum.AuthenticationProvider](https://github.com/cirreum/Cirreum.AuthenticationProvider) | Authentication (core) | Provider contracts and registration for the Authentication track. |
 | [Cirreum.IdentityProvider](https://github.com/cirreum/Cirreum.IdentityProvider) | Identity (core) | Provisioning contracts and instance-keying. |
-| [Cirreum.InvocationProvider](https://github.com/cirreum/Cirreum.InvocationProvider) | Invocation (core) | Foundational seam for inbound invocation sources — `IInvocationContext`, `IInvocationConnection` (with typed `SendAsync<T>`), `IConnectionLifecycle`, registrar base. |
 | [Cirreum.SecretsProvider](https://github.com/cirreum/Cirreum.SecretsProvider) | Secrets (core) | Secret-store contracts and registration. |
 | [Cirreum.ServiceProvider](https://github.com/cirreum/Cirreum.ServiceProvider) | infra | Runtime service-registration plumbing used by other provider tracks. |
 
 ### Infrastructure — provider implementations and host services
 
-**Authorization providers**
+**Authentication providers**
 
 | Package | Description |
 | --------- | ------------- |
-| [Cirreum.Authorization.ApiKey](https://github.com/cirreum/Cirreum.Authorization.ApiKey) | API-key bearer authorization. |
-| [Cirreum.Authorization.Entra](https://github.com/cirreum/Cirreum.Authorization.Entra) | Microsoft Entra ID (workforce / employee tenant). |
-| [Cirreum.Authorization.External](https://github.com/cirreum/Cirreum.Authorization.External) | External JWT bearer (arbitrary OIDC issuer). |
-| [Cirreum.Authorization.Oidc](https://github.com/cirreum/Cirreum.Authorization.Oidc) | Generic OIDC bearer. |
-| [Cirreum.Authorization.SignedRequest](https://github.com/cirreum/Cirreum.Authorization.SignedRequest) | HMAC-signed-request authorization (server side). |
-| [Cirreum.Authorization.SignedRequest.Client](https://github.com/cirreum/Cirreum.Authorization.SignedRequest.Client) | HMAC-signed-request client SDK. |
+| [Cirreum.Authentication.ApiKey](https://github.com/cirreum/Cirreum.Authentication.ApiKey) | API-key scheme (Bearer / custom header). |
+| [Cirreum.Authentication.Entra](https://github.com/cirreum/Cirreum.Authentication.Entra) | Microsoft Entra ID (workforce / employee tenant). |
+| [Cirreum.Authentication.External](https://github.com/cirreum/Cirreum.Authentication.External) | External JWT bearer (arbitrary OIDC issuer). |
+| [Cirreum.Authentication.Oidc](https://github.com/cirreum/Cirreum.Authentication.Oidc) | Generic OIDC bearer. |
+| [Cirreum.Authentication.SessionTicket](https://github.com/cirreum/Cirreum.Authentication.SessionTicket) | Opaque session-ticket scheme. |
+| [Cirreum.Authentication.SignedRequest](https://github.com/cirreum/Cirreum.Authentication.SignedRequest) | HMAC signed-request scheme (server side). |
+| [Cirreum.Authentication.SignedRequest.Client](https://github.com/cirreum/Cirreum.Authentication.SignedRequest.Client) | Outbound signed-request client SDK. |
 
 **Identity providers**
 
@@ -536,13 +539,6 @@ Every published Cirreum repo, organized by folder. Each folder is a layer; withi
 | --------- | ------------- |
 | [Cirreum.Identity.EntraExternalId](https://github.com/cirreum/Cirreum.Identity.EntraExternalId) | Microsoft Entra External ID provisioning. |
 | [Cirreum.Identity.Oidc](https://github.com/cirreum/Cirreum.Identity.Oidc) | Generic OIDC provisioning (Auth0, Okta, Descope, Keycloak, …). |
-
-**Invocation sources** *(HTTP is the framework default and lives in `Cirreum.Services.Server`)*
-
-| Package | Description |
-| --------- | ------------- |
-| [Cirreum.Invocation.SignalR](https://github.com/cirreum/Cirreum.Invocation.SignalR) | SignalR Hubs as a Cirreum invocation source — per-Hub-method `IInvocationContext`, per-connection `SignalRConnection`, lifecycle hooks. |
-| [Cirreum.Invocation.WebSockets](https://github.com/cirreum/Cirreum.Invocation.WebSockets) | Raw WebSocket endpoints as a Cirreum invocation source — per-message `IInvocationContext`, per-connection `IWebSocketConnection` (typed `SendAsync<T>` + `SendBytesAsync` for binary frames), lifecycle hooks, optional companion HTTP request endpoint. |
 
 **Persistence implementations**
 
@@ -569,6 +565,7 @@ Every published Cirreum repo, organized by folder. Each folder is a layer; withi
 | [Cirreum.Messaging.Azure](https://github.com/cirreum/Cirreum.Messaging.Azure) | Messaging | Azure Service Bus. |
 | [Cirreum.Secrets.Azure](https://github.com/cirreum/Cirreum.Secrets.Azure) | Secrets | Azure Key Vault. |
 | [Cirreum.Graph.Provider](https://github.com/cirreum/Cirreum.Graph.Provider) | infra | Microsoft Graph SDK provider. |
+| [Cirreum.Introspection](https://github.com/cirreum/Cirreum.Introspection) | infra | Boot-time diagnostics and endpoint-posture analysis. |
 | [Cirreum.QueryCache.Distributed](https://github.com/cirreum/Cirreum.QueryCache.Distributed) | infra | Distributed cache backing for `Conductor.ICacheableOperation`. |
 | [Cirreum.QueryCache.Hybrid](https://github.com/cirreum/Cirreum.QueryCache.Hybrid) | infra | Hybrid (in-memory + distributed) cache backing. |
 
@@ -576,7 +573,7 @@ Every published Cirreum repo, organized by folder. Each folder is a layer; withi
 
 | Package | Description |
 | --------- | ------------- |
-| [Cirreum.Services.Server](https://github.com/cirreum/Cirreum.Services.Server) | ASP.NET Core host services — Result-to-HTTP, ProblemDetails, etc. |
+| [Cirreum.Services.Server](https://github.com/cirreum/Cirreum.Services.Server) | ASP.NET Core host services — Result-to-HTTP, ProblemDetails, the HTTP→`IInvocationContext` bridge, and code-first SignalR + WebSocket invocation sources. |
 | [Cirreum.Services.Wasm](https://github.com/cirreum/Cirreum.Services.Wasm) | Blazor WASM host services. |
 | [Cirreum.Services.Serverless](https://github.com/cirreum/Cirreum.Services.Serverless) | Azure Functions host services. |
 
@@ -587,9 +584,8 @@ Every published Cirreum repo, organized by folder. Each folder is a layer; withi
 | [Cirreum.Runtime.Server](https://github.com/cirreum/Cirreum.Runtime.Server) | main | App package for ASP.NET Core hosts. |
 | [Cirreum.Runtime.Wasm](https://github.com/cirreum/Cirreum.Runtime.Wasm) | main | App package for Blazor WASM hosts. |
 | [Cirreum.Runtime.Serverless](https://github.com/cirreum/Cirreum.Runtime.Serverless) | main | App package for Azure Functions hosts. |
-| [Cirreum.Runtime.AuthorizationProvider](https://github.com/cirreum/Cirreum.Runtime.AuthorizationProvider) | Authorization (runtime core) | Runtime-side core for the authorization provider track. |
+| [Cirreum.Runtime.AuthenticationProvider](https://github.com/cirreum/Cirreum.Runtime.AuthenticationProvider) | Authentication (runtime core) | Runtime-side core for the Authentication provider track. |
 | [Cirreum.Runtime.IdentityProvider](https://github.com/cirreum/Cirreum.Runtime.IdentityProvider) | Identity (runtime core) | Runtime-side core for the identity provider track. |
-| [Cirreum.Runtime.InvocationProvider](https://github.com/cirreum/Cirreum.Runtime.InvocationProvider) | Invocation (runtime core) | Runtime-side core for the invocation provider track — `IInvocationBuilder`, `RegisterInvocationProvider<>` helper, `InvocationProviderMapping`. |
 | [Cirreum.Runtime.SecretsProvider](https://github.com/cirreum/Cirreum.Runtime.SecretsProvider) | Secrets (runtime core) | Runtime-side core for the secrets provider track. |
 | [Cirreum.Runtime.ServiceProvider](https://github.com/cirreum/Cirreum.Runtime.ServiceProvider) | infra | Runtime-side provider-pattern plumbing. |
 
@@ -597,14 +593,11 @@ Every published Cirreum repo, organized by folder. Each folder is a layer; withi
 
 | Package | Track | Description |
 | --------- | ------- | ------------- |
-| [Cirreum.Runtime.Authorization](https://github.com/cirreum/Cirreum.Runtime.Authorization) | Authorization | `builder.AddAuthorization(...)` umbrella; pulls authorization providers transitively. |
+| [Cirreum.Runtime.Authentication](https://github.com/cirreum/Cirreum.Runtime.Authentication) | Authentication | `builder.AddAuthentication(...)` umbrella; pulls authentication schemes transitively. |
 | [Cirreum.Runtime.Communications](https://github.com/cirreum/Cirreum.Runtime.Communications) | Communications | Email + SMS umbrella. |
 | [Cirreum.Runtime.Identity](https://github.com/cirreum/Cirreum.Runtime.Identity) | Identity | `builder.AddIdentity(p => p.AddProvisioner<T>(key))` cross-protocol umbrella. |
 | [Cirreum.Runtime.Identity.Oidc](https://github.com/cirreum/Cirreum.Runtime.Identity.Oidc) | Identity | Per-protocol entry: generic OIDC. |
 | [Cirreum.Runtime.Identity.EntraExternalId](https://github.com/cirreum/Cirreum.Runtime.Identity.EntraExternalId) | Identity | Per-protocol entry: Entra External ID. |
-| [Cirreum.Runtime.Invocation](https://github.com/cirreum/Cirreum.Runtime.Invocation) | Invocation | `builder.AddInvocation(b => b.AddSignalR<THub>(key).AddWebSocket<THandler>(key, ...))` cross-source umbrella. |
-| [Cirreum.Runtime.Invocation.SignalR](https://github.com/cirreum/Cirreum.Runtime.Invocation.SignalR) | Invocation | Per-source entry: SignalR Hubs. |
-| [Cirreum.Runtime.Invocation.WebSockets](https://github.com/cirreum/Cirreum.Runtime.Invocation.WebSockets) | Invocation | Per-source entry: raw WebSocket endpoints; provider-level `WebSocketOptions` from configuration. |
 | [Cirreum.Runtime.Messaging](https://github.com/cirreum/Cirreum.Runtime.Messaging) | Messaging | Messaging umbrella. |
 | [Cirreum.Runtime.Persistence](https://github.com/cirreum/Cirreum.Runtime.Persistence) | Persistence | Persistence umbrella (provider-agnostic). |
 | [Cirreum.Runtime.Persistence.Azure](https://github.com/cirreum/Cirreum.Runtime.Persistence.Azure) | Persistence | Cosmos DB. |
@@ -711,14 +704,14 @@ api.MapGet("/customers/{id}", static async (
     Guid id,
     IDispatcher dispatcher,
     CancellationToken ct) =>
-        await dispatcher.Dispatch(new GetCustomer(id), ct));
+        await dispatcher.DispatchAsync(new GetCustomer(id), ct));
 ```
 
 ### WASM (Blazor)
 
 ```csharp
 private async Task LoadCustomer() {
-    var result = await Dispatcher.Dispatch(new GetCustomer(CustomerId));
+    var result = await Dispatcher.DispatchAsync(new GetCustomer(CustomerId));
 
     result.Switch(
         onSuccess: value => {
@@ -737,7 +730,7 @@ private async Task LoadCustomer() {
 public async Task<IActionResult> Run(
     [HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequest req) {
 
-    var result = await _dispatcher.Dispatch(new GetCustomer(Guid.Parse(req.Query["id"])));
+    var result = await _dispatcher.DispatchAsync(new GetCustomer(Guid.Parse(req.Query["id"])));
 
     return result.Match(
         onSuccess: value => new OkObjectResult(value),

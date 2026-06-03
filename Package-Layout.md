@@ -1,181 +1,167 @@
 # Cirreum Package Architecture
 
-This document describes the layered architecture of Cirreum packages. Dependencies flow in one direction only:
+This document describes the layered architecture of Cirreum packages. Each layer may depend on the layers below it; dependencies never flow the other way.
 
 ```
-L5 → L4 → L3 → L2 → L1 → L0
+Runtime Extensions → Runtime → Infrastructure → Core → Common → Base
 ```
 
-> **Note:** Not every package references all layers. For example, most Layer 3 packages reference Layer 1, but some also reference Layer 2.
+> **Note:** Not every package references every layer beneath it. A Core package, for example, typically references Base and Common but not every Common package.
 
 Packages also belong to one of two **tracks**:
 
-- **App Track** — the linear framework spine. App code references multiple layers directly.
-- **Provider Track** — pluggable cross-cutting services (Authorization, Identity, Persistence, Communications, Messaging, Storage, Secrets). App code references only the L5 umbrella; implementations flow in transitively.
+- **Main track** — the linear framework spine. App code references a few layers directly (the foundation, a host's services, and that host's runtime).
+- **Provider track** — pluggable cross-cutting services (Authentication, Identity, Persistence, Communications, Messaging, Storage, Secrets). App code references only the app-facing umbrella; implementations flow in transitively.
 
 ---
 
-## Layer 0 (Base)
+## Base
 
-Dependency free - could be used by any application/consumer, not just Cirreum.
+Dependency-free — usable by any application or consumer, not just Cirreum.
 
-- `Cirreum.Result` - Result, Result<T> and Optional<T?> monads/railway
-- `Cirreum.Exceptions` - Predetermined application exceptions
+- `Cirreum.Result` — `Result`, `Result<T>`, and `Optional<T>` monads (railway-oriented programming)
+- `Cirreum.Exceptions` — predefined application exceptions, designed to be captured as `Result<T>.Fail(...)`
+- `Cirreum.Kernel` — foundational cross-host abstractions, contracts, value types, and the framework bootstrap surface
 
 ---
 
-## Layer 1 (Common)
+## Common
 
-Abstractions, dependency light - technically could be used by any application/consumer, not just Cirreum. Unless noted, assumed Server/Serverless only.
+Framework-neutral abstractions — dependency-light, usable in any ASP.NET host with or without the rest of Cirreum. Unless noted, assumed Server/Serverless.
 
-- `Cirreum.Communications.Email`
-- `Cirreum.Communications.Sms`
+- `Cirreum.Common` — cross-host primitives: Conductor (CQRS), caching, state, presence, remote services, file system, and the authorization vocabulary
 - `Cirreum.Cors`
 - `Cirreum.ExpressionBuilder` *(env/host agnostic)*
 - `Cirreum.Logging.Deferred`
-- `Cirreum.Messaging`
+- `Cirreum.Startup` *(env/host agnostic)*
+- `Cirreum.Providers` — provider-pattern plumbing shared across provider tracks
+- `Cirreum.Messaging` — message queue / pub-sub abstractions
+- `Cirreum.Messaging.Distributed` — distributed message-envelope abstractions
 - `Cirreum.Persistence.NoSql`
 - `Cirreum.Persistence.Sql`
-- `Cirreum.Providers`
-- `Cirreum.Startup` *(env/host agnostic)*
 - `Cirreum.Storage`
-- `Cirreum.Storage.Browser` *(Blazor WASM/Browser)*
+- `Cirreum.Storage.Browser` *(Blazor WASM / browser)*
+- `Cirreum.Communications.Email`
+- `Cirreum.Communications.Sms`
 
 ---
 
-## Layer 2 (Core)
+## Core
 
-Dependency light - Cross Env/Host (Browser, Server, Serverless).
+The framework spine plus the provider abstraction cores. Cross-host (browser, server, serverless).
 
-### App Track
-- `Cirreum.Components.WebAssembly` - Blazor WASM Client Components Library
-- `Cirreum.Core` - Application Core/Kernel
+### Main track
+- `Cirreum.Shared` — cross-host spine implementations: Conductor dispatcher/publisher, caching, state, presence, remote services, and the authorization-pillar implementations
+- `Cirreum.Components.WebAssembly` — Blazor WASM component library
 
-### Provider Track
-- `Cirreum.AuthorizationProvider` - extends Cirreum.Providers
-- `Cirreum.IdentityProvider` - extends Cirreum.Providers
-- `Cirreum.InvocationProvider` - extends Cirreum.Providers; foundational seam for inbound invocation sources (HTTP, SignalR, raw WebSocket, gRPC streaming) — `IInvocationContext`, `IInvocationConnection`, registrar base
-- `Cirreum.SecretsProvider` - extends Cirreum.Providers
-- `Cirreum.ServiceProvider` - extends Cirreum.Providers
-
----
-
-## Layer 3 (Infrastructure)
-
-### Provider Track (implementations)
-
-**Authorization**
-- `Cirreum.Authorization.ApiKey` - extends Cirreum.AuthorizationProvider
-- `Cirreum.Authorization.Entra` - extends Cirreum.AuthorizationProvider
-- `Cirreum.Authorization.External` - extends Cirreum.AuthorizationProvider
-- `Cirreum.Authorization.Oidc` - extends Cirreum.AuthorizationProvider
-- `Cirreum.Authorization.SignedRequest` - extends Cirreum.AuthorizationProvider
-- `Cirreum.Authorization.SignedRequest.Client` - extends Cirreum.AuthorizationProvider
-
-**Identity**
-- `Cirreum.Identity.EntraExternalId` - extends Cirreum.IdentityProvider
-- `Cirreum.Identity.Oidc` - extends Cirreum.IdentityProvider
-
-**Invocation** (long-lived dispatch sources — HTTP is the framework default and lives in `Cirreum.Services.Server`)
-- `Cirreum.Invocation.SignalR` - extends Cirreum.InvocationProvider; SignalR Hubs as a Cirreum invocation source
-- `Cirreum.Invocation.WebSockets` - extends Cirreum.InvocationProvider; raw WebSocket endpoints as a Cirreum invocation source
-
-**Communications**
-- `Cirreum.Communications.Email.Azure` - extends Cirreum.Communications.Email and Cirreum.ServiceProvider
-- `Cirreum.Communications.Email.SendGrid` - extends Cirreum.Communications.Email and Cirreum.ServiceProvider
-- `Cirreum.Communications.Sms.Azure` - extends Cirreum.Communications.Sms and Cirreum.ServiceProvider
-- `Cirreum.Communications.Sms.Twilio` - extends Cirreum.Communications.Sms and Cirreum.ServiceProvider
-
-**Messaging / Persistence / Storage / Secrets**
-- `Cirreum.Messaging.Azure` - extends Cirreum.Messaging and Cirreum.ServiceProvider
-- `Cirreum.Persistence.Azure` - extends Cirreum.Persistence.NoSql and Cirreum.ServiceProvider
-- `Cirreum.Persistence.SqlServer` - extends Cirreum.Persistence.Sql and Cirreum.ServiceProvider
-- `Cirreum.Persistence.SQLite` - extends Cirreum.Persistence.Sql and Cirreum.ServiceProvider
-- `Cirreum.Storage.Azure` - extends Cirreum.ServiceProvider
-- `Cirreum.Secrets.Azure` - extends Cirreum.SecretsProvider
-
-### Reusable Infrastructure
-Depends on Cirreum.Core.
-
-- `Cirreum.Graph.Provider` - Reusable MS Graph provider
-- `Cirreum.QueryCache.Distributed` - optionally provides caching for Cirreum.Core (Conductor.ICacheableOperation)
-- `Cirreum.QueryCache.Hybrid` - optionally provides caching for Cirreum.Core (Conductor.ICacheableOperation)
-
-### App Track
-Implements Cirreum.Core host-specific services, enforces patterns/conventions.
-
-- `Cirreum.Services.Server`
-- `Cirreum.Services.Wasm`
-- `Cirreum.Services.Serverless`
+### Provider track (abstraction cores)
+- `Cirreum.AuthenticationProvider` — Authentication track contracts and registration
+- `Cirreum.IdentityProvider` — identity provisioning contracts and instance-keying
+- `Cirreum.SecretsProvider` — secret-store contracts and registration
+- `Cirreum.ServiceProvider` — runtime service-registration plumbing used by other provider tracks
 
 ---
 
-## Layer 4 (Runtime)
+## Infrastructure
 
-Hosting implementation.
+Provider implementations and host-specific services.
 
-### Provider Track
-- `Cirreum.Runtime.AuthorizationProvider`
-- `Cirreum.Runtime.IdentityProvider`
-- `Cirreum.Runtime.InvocationProvider` - `IInvocationBuilder`, `RegisterInvocationProvider<>` helper, `InvocationProviderMapping`
-- `Cirreum.Runtime.SecretsProvider`
-- `Cirreum.Runtime.ServiceProvider`
+### Host services (main track)
+- `Cirreum.Services.Server` — ASP.NET Core host services: Result-to-HTTP, ProblemDetails, the HTTP→`IInvocationContext` bridge, plus code-first SignalR and WebSocket invocation sources
+- `Cirreum.Services.Wasm` — Blazor WASM host services
+- `Cirreum.Services.Serverless` — Azure Functions host services
 
-### App Track
+### Authentication providers
+- `Cirreum.Authentication.ApiKey`
+- `Cirreum.Authentication.Entra` — Microsoft Entra ID (workforce tenant)
+- `Cirreum.Authentication.External` — external JWT bearer (arbitrary OIDC issuer)
+- `Cirreum.Authentication.Oidc` — generic OIDC bearer
+- `Cirreum.Authentication.SessionTicket` — opaque session-ticket scheme
+- `Cirreum.Authentication.SignedRequest` — HMAC signed-request (server side)
+- `Cirreum.Authentication.SignedRequest.Client` — outbound signing SDK
+
+### Identity providers
+- `Cirreum.Identity.Oidc` — generic OIDC provisioning (Auth0, Okta, Descope, Keycloak, …)
+- `Cirreum.Identity.EntraExternalId` — Microsoft Entra External ID provisioning
+
+### Communications / Messaging / Persistence / Storage / Secrets implementations
+- `Cirreum.Communications.Email.Azure`
+- `Cirreum.Communications.Email.SendGrid`
+- `Cirreum.Communications.Sms.Azure`
+- `Cirreum.Communications.Sms.Twilio`
+- `Cirreum.Messaging.Azure` — Azure Service Bus
+- `Cirreum.Persistence.Azure` — Azure Cosmos DB
+- `Cirreum.Persistence.SqlServer` — SQL Server (Dapper)
+- `Cirreum.Persistence.SQLite`
+- `Cirreum.Storage.Azure` — Azure Blob Storage
+- `Cirreum.Secrets.Azure` — Azure Key Vault
+
+### Reusable infrastructure
+- `Cirreum.Graph.Provider` — Microsoft Graph SDK provider
+- `Cirreum.Introspection` — boot-time diagnostics and endpoint-posture analysis
+- `Cirreum.QueryCache.Distributed` — distributed cache backing for cacheable operations
+- `Cirreum.QueryCache.Hybrid` — hybrid (in-memory + distributed) cache backing
+
+---
+
+## Runtime
+
+Host wiring and provider runtime cores.
+
+### Main track
 - `Cirreum.Runtime.Server`
 - `Cirreum.Runtime.Wasm`
 - `Cirreum.Runtime.Serverless`
 
+### Provider track (runtime cores)
+- `Cirreum.Runtime.AuthenticationProvider`
+- `Cirreum.Runtime.IdentityProvider`
+- `Cirreum.Runtime.SecretsProvider`
+- `Cirreum.Runtime.ServiceProvider`
+
 ---
 
-## Layer 5 (Runtime Extensions)
+## Runtime Extensions
 
-Optional extensions that compose lower layers and services. Allows single-call registration of all Registrars using appsettings/Cirreum.Secrets.
+App-facing umbrellas — what your application actually installs. Each enables single-call registration that composes the lower layers.
 
-### Provider Track
-
-**Authorization / Identity**
-- `Cirreum.Runtime.Authorization`
-- `Cirreum.Runtime.Identity` *(cross-protocol identity umbrella)*
-- `Cirreum.Runtime.Identity.Oidc` *(generic OIDC: Auth0, Okta, Descope, Keycloak, etc.)*
+### Authentication / Identity
+- `Cirreum.Runtime.Authentication` — `builder.AddAuthentication(...)` umbrella
+- `Cirreum.Runtime.Identity` — `builder.AddIdentity(...)` cross-protocol umbrella
+- `Cirreum.Runtime.Identity.Oidc` *(generic OIDC: Auth0, Okta, Descope, Keycloak, …)*
 - `Cirreum.Runtime.Identity.EntraExternalId` *(Microsoft Entra External ID)*
-- `Cirreum.Runtime.Wasm.Msal` *(WASM client identity flows via MSAL — Entra workforce / B2C)*
-- `Cirreum.Runtime.Wasm.Oidc` *(WASM client identity flows via generic OIDC)*
+- `Cirreum.Runtime.Wasm.Msal` *(WASM client identity via MSAL — Entra workforce / B2C)*
+- `Cirreum.Runtime.Wasm.Oidc` *(WASM client identity via generic OIDC)*
 
-**Invocation** *(unified `AddInvocation()` / `MapInvocation()` for long-lived dispatch sources alongside the framework-default HTTP)*
-- `Cirreum.Runtime.Invocation` *(cross-source invocation umbrella)*
-- `Cirreum.Runtime.Invocation.SignalR` *(SignalR Hubs)*
-- `Cirreum.Runtime.Invocation.WebSockets` *(raw WebSocket endpoints; provider-level `WebSocketOptions` + per-instance handlers)*
-
-**Communications / Messaging**
-- `Cirreum.Runtime.Communications` *(SMS and Email)*
+### Communications / Messaging
+- `Cirreum.Runtime.Communications` *(email + SMS)*
 - `Cirreum.Runtime.Messaging`
 
-**Persistence**
+### Persistence
 - `Cirreum.Runtime.Persistence` *(all persistence providers)*
-- `Cirreum.Runtime.Persistence.Azure` *(just the Azure provider)*
-- `Cirreum.Runtime.Persistence.SqlServer` *(just the SqlServer provider)*
-- `Cirreum.Runtime.Persistence.SQLite` *(just the SQLite provider)*
+- `Cirreum.Runtime.Persistence.Azure` *(Cosmos DB)*
+- `Cirreum.Runtime.Persistence.SqlServer`
+- `Cirreum.Runtime.Persistence.SQLite`
 
-**Secrets / Storage**
-- `Cirreum.Runtime.Secrets` *(used internally by all others for KeyVault)*
-- `Cirreum.Runtime.Storage`
+### Secrets / Storage
+- `Cirreum.Runtime.Secrets` *(Azure Key Vault)*
+- `Cirreum.Runtime.Storage` *(Azure Blob Storage)*
 
 ---
 
-## Typical Server (API) Package References
+## Typical Server (API) package references
 
 ```xml
 <PackageReference Include="Cirreum.Runtime.Server" Version="1.0.*" />
 <PackageReference Include="Cirreum.Runtime.Secrets" Version="1.0.*" />
-<PackageReference Include="Cirreum.Runtime.Authorization" Version="1.0.*" />
+<PackageReference Include="Cirreum.Runtime.Authentication" Version="1.0.*" />
 <PackageReference Include="Cirreum.Runtime.Identity" Version="1.0.*" />
 <PackageReference Include="Cirreum.Runtime.Persistence.Azure" Version="1.0.*" />
 <!-- OR -->
 <PackageReference Include="Cirreum.Runtime.Persistence.SqlServer" Version="1.0.*" />
 ```
 
-### Optional Packages
+### Optional packages
 
 For blob storage, SMS/email communications, and Service Bus messaging:
 
