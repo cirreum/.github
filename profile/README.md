@@ -252,7 +252,7 @@ Cirreum is split into small packages so applications can take only what they nee
 
 | Package | Purpose |
 | ------- | ------- |
-| `Cirreum.Kernel` / `Cirreum.Common` / `Cirreum.Shared` | Foundation — contracts, the Conductor pipeline, and cross-host implementations (pulled in transitively) |
+| `Cirreum.Kernel` / `Cirreum.Contracts` / `Cirreum.Domain` | Foundation — contracts, the Conductor pipeline, and cross-host implementations (pulled in transitively) |
 | `Cirreum.Runtime.Server` | ASP.NET Core host integration |
 | `Cirreum.Runtime.Wasm` | Blazor WebAssembly integration |
 | `Cirreum.Runtime.Serverless` | Azure Functions integration |
@@ -455,15 +455,15 @@ Cirreum is organized into consistent dependency layers and split between two tra
 | Layer | Purpose | Example |
 | --------- | --------- | --------- |
 | **Base** | Zero dependencies, usable anywhere | `Cirreum.Result`, `Cirreum.Kernel` |
-| **Common** | Framework-neutral, reusable across hosts | `Cirreum.Common` |
-| **Core** | The framework spine — once you reference this, you're committed to Cirreum | `Cirreum.Shared` |
+| **Common** | Framework-neutral, reusable across hosts | `Cirreum.Contracts` |
+| **Core** | The framework spine — once you reference this, you're committed to Cirreum | `Cirreum.Domain` |
 | **Infrastructure** | Host services + provider implementations | `Cirreum.Services.Server` |
 | **Runtime** | Host wiring + provider runtime cores | `Cirreum.Runtime.Server` |
 | **Runtime Extensions** | App-facing entry points (`AddX()` / `MapX()` extensions) | `Cirreum.Runtime.Authentication` |
 
 ### Two tracks
 
-**Main track** — the framework spine: `Cirreum.Kernel` → `Cirreum.Common` → `Cirreum.Shared` → a `Cirreum.Services.{host}` → a `Cirreum.Runtime.{host}`. Apps reference the foundation plus their host's services and runtime. Linear dependency chain. Not pluggable.
+**Main track** — the framework spine: `Cirreum.Kernel` → `Cirreum.Contracts` → `Cirreum.Domain` → a `Cirreum.Services.{host}` → a `Cirreum.Runtime.{host}`. Apps reference the foundation plus their host's services and runtime. Linear dependency chain. Not pluggable.
 
 **Provider tracks** — pluggable cross-cutting services. Each provider family (Authentication, Identity, Persistence, Communications, Messaging, Storage, Secrets) follows the same shape — a contracts/abstractions package, one or more implementations, and an app-facing umbrella:
 
@@ -493,9 +493,10 @@ Every Cirreum repo, organized by folder. Each folder is a layer; within a layer,
 
 | Package | Track | Description |
 | --------- | ------- | ------------- |
-| [Cirreum.Common](https://github.com/cirreum/Cirreum.Common) | main | Cross-host primitives — Conductor (CQRS), caching, state, presence, remote services, file system, and the authorization vocabulary. |
+| [Cirreum.Contracts](https://github.com/cirreum/Cirreum.Contracts) | main | Cross-host primitives — Conductor (CQRS), caching, state, presence, profile enrichment, remote services, file system, invocation, and the authorization vocabulary + contracts. |
 | [Cirreum.Communications.Email](https://github.com/cirreum/Cirreum.Communications.Email) | Communications | Email sender contracts and templates. |
 | [Cirreum.Communications.Sms](https://github.com/cirreum/Cirreum.Communications.Sms) | Communications | SMS sender contracts and templates. |
+| [Cirreum.Coordination](https://github.com/cirreum/Cirreum.Coordination) | main | Atomic coordination primitives (replay guards, request throttles) shared across provider tracks. |
 | [Cirreum.Cors](https://github.com/cirreum/Cirreum.Cors) | main | CORS configuration helpers. |
 | [Cirreum.ExpressionBuilder](https://github.com/cirreum/Cirreum.ExpressionBuilder) | main | Dynamic LINQ expression-tree utilities. |
 | [Cirreum.Logging.Deferred](https://github.com/cirreum/Cirreum.Logging.Deferred) | main | Deferred / batched logging primitives. |
@@ -504,6 +505,7 @@ Every Cirreum repo, organized by folder. Each folder is a layer; within a layer,
 | [Cirreum.Persistence.NoSql](https://github.com/cirreum/Cirreum.Persistence.NoSql) | Persistence | Document-database repository + unit-of-work abstractions. |
 | [Cirreum.Persistence.Sql](https://github.com/cirreum/Cirreum.Persistence.Sql) | Persistence | SQL repository abstractions built on Dapper. |
 | [Cirreum.Providers](https://github.com/cirreum/Cirreum.Providers) | infra | Provider-pattern plumbing shared across all provider tracks. |
+| [Cirreum.SignedRequest](https://github.com/cirreum/Cirreum.SignedRequest) | Authentication | RFC 9421 signed-request primitives (verify + sign), shared between server and client. |
 | [Cirreum.Startup](https://github.com/cirreum/Cirreum.Startup) | main | `DomainApplication` host-bootstrap helpers. |
 | [Cirreum.Storage](https://github.com/cirreum/Cirreum.Storage) | Storage | Blob storage abstractions. |
 | [Cirreum.Storage.Browser](https://github.com/cirreum/Cirreum.Storage.Browser) | Storage | Browser-side storage helpers (LocalStorage, SessionStorage, IndexedDB). |
@@ -512,7 +514,7 @@ Every Cirreum repo, organized by folder. Each folder is a layer; within a layer,
 
 | Package | Track | Description |
 | --------- | ------- | ------------- |
-| [Cirreum.Shared](https://github.com/cirreum/Cirreum.Shared) | main | Cross-host spine implementations — Conductor dispatcher/publisher, caching, state, presence, and the authorization-pillar implementations. |
+| [Cirreum.Domain](https://github.com/cirreum/Cirreum.Domain) | main | Cross-host spine implementations — Conductor dispatcher/publisher, caching, state, presence, profile enrichment, and the authorization-pillar implementations. |
 | [Cirreum.Components.WebAssembly](https://github.com/cirreum/Cirreum.Components.WebAssembly) | main | Reusable Blazor components (TreeView, DataGrid, forms) with multi-theme support. |
 | [Cirreum.AuthenticationProvider](https://github.com/cirreum/Cirreum.AuthenticationProvider) | Authentication (core) | Provider contracts and registration for the Authentication track. |
 | [Cirreum.IdentityProvider](https://github.com/cirreum/Cirreum.IdentityProvider) | Identity (core) | Provisioning contracts and instance-keying. |
@@ -566,8 +568,9 @@ Every Cirreum repo, organized by folder. Each folder is a layer; within a layer,
 | [Cirreum.Secrets.Azure](https://github.com/cirreum/Cirreum.Secrets.Azure) | Secrets | Azure Key Vault. |
 | [Cirreum.Graph.Provider](https://github.com/cirreum/Cirreum.Graph.Provider) | infra | Microsoft Graph SDK provider. |
 | [Cirreum.Introspection](https://github.com/cirreum/Cirreum.Introspection) | infra | Boot-time diagnostics and endpoint-posture analysis. |
-| [Cirreum.QueryCache.Distributed](https://github.com/cirreum/Cirreum.QueryCache.Distributed) | infra | Distributed cache backing for `Conductor.ICacheableOperation`. |
-| [Cirreum.QueryCache.Hybrid](https://github.com/cirreum/Cirreum.QueryCache.Hybrid) | infra | Hybrid (in-memory + distributed) cache backing. |
+| [Cirreum.Coordination.Redis](https://github.com/cirreum/Cirreum.Coordination.Redis) | infra | Redis-backed atomic coordination. |
+| [Cirreum.Cache.Distributed](https://github.com/cirreum/Cirreum.Cache.Distributed) | infra | Distributed cache backing for `Conductor.ICacheableOperation`. |
+| [Cirreum.Cache.Hybrid](https://github.com/cirreum/Cirreum.Cache.Hybrid) | infra | Hybrid (in-memory + distributed) cache backing. |
 
 **Host services (main track)**
 

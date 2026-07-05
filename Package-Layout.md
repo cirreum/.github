@@ -29,12 +29,14 @@ Dependency-free — usable by any application or consumer, not just Cirreum.
 
 Framework-neutral abstractions — dependency-light, usable in any ASP.NET host with or without the rest of Cirreum. Unless noted, assumed Server/Serverless.
 
-- `Cirreum.Common` — cross-host primitives: Conductor (CQRS), caching, state, presence, remote services, file system, and the authorization vocabulary
+- `Cirreum.Contracts` — cross-host primitives: Conductor (CQRS), caching, state, presence, profile enrichment, remote services, file system, invocation, and the authorization vocabulary + contracts
+- `Cirreum.Coordination` — atomic coordination primitives (replay guards, request throttles) shared across provider tracks
 - `Cirreum.Cors`
 - `Cirreum.ExpressionBuilder` *(env/host agnostic)*
 - `Cirreum.Logging.Deferred`
 - `Cirreum.Startup` *(env/host agnostic)*
 - `Cirreum.Providers` — provider-pattern plumbing shared across provider tracks
+- `Cirreum.SignedRequest` — RFC 9421 signed-request primitives (verify + sign), shared client/server
 - `Cirreum.Messaging` — message queue / pub-sub abstractions
 - `Cirreum.Messaging.Distributed` — distributed message-envelope abstractions
 - `Cirreum.Persistence.NoSql`
@@ -51,7 +53,7 @@ Framework-neutral abstractions — dependency-light, usable in any ASP.NET host 
 The framework spine plus the provider abstraction cores. Cross-host (browser, server, serverless).
 
 ### Main track
-- `Cirreum.Shared` — cross-host spine implementations: Conductor dispatcher/publisher, caching, state, presence, remote services, and the authorization-pillar implementations
+- `Cirreum.Domain` — cross-host spine implementations: Conductor dispatcher/publisher, caching, state, presence, profile enrichment, remote services, and the authorization-pillar implementations
 - `Cirreum.Components.WebAssembly` — Blazor WASM component library
 
 ### Provider track (abstraction cores)
@@ -99,8 +101,9 @@ Provider implementations and host-specific services.
 ### Reusable infrastructure
 - `Cirreum.Graph.Provider` — Microsoft Graph SDK provider
 - `Cirreum.Introspection` — boot-time diagnostics and endpoint-posture analysis
-- `Cirreum.QueryCache.Distributed` — distributed cache backing for cacheable operations
-- `Cirreum.QueryCache.Hybrid` — hybrid (in-memory + distributed) cache backing
+- `Cirreum.Coordination.Redis` — Redis-backed atomic coordination
+- `Cirreum.Cache.Distributed` — distributed cache backing for cacheable operations
+- `Cirreum.Cache.Hybrid` — hybrid (in-memory + distributed) cache backing
 
 ---
 
