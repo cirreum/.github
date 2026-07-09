@@ -5,6 +5,15 @@
 <h1 align="center">Cirreum</h1>
 <h4 align="center">Layered simplicity for modern .NET</h4>
 
+<p align="center">
+  <a href="https://www.nuget.org/packages/Cirreum.Runtime.Server"><img src="https://img.shields.io/nuget/v/Cirreum.Runtime.Server.svg?label=Cirreum.Runtime.Server&color=004880&logo=nuget" alt="Cirreum.Runtime.Server on NuGet" /></a>
+  <a href="https://www.nuget.org/profiles/cirreum"><img src="https://img.shields.io/badge/NuGet-cirreum-004880?logo=nuget" alt="Cirreum on NuGet" /></a>
+  <img src="https://img.shields.io/badge/.NET-10-512BD4?logo=dotnet" alt=".NET 10" />
+  <a href="https://github.com/cirreum/Cirreum.Result/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green.svg" alt="MIT License" /></a>
+</p>
+
+<p align="center"><strong>v1.0 is here</strong> — the full framework is published on NuGet. Every layer, from the foundation to the app-facing runtime umbrellas, is released and ready to install.</p>
+
 ---
 
 ## Build .NET applications once — run them across API, Blazor, and serverless hosts
