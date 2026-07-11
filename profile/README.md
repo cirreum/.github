@@ -14,6 +14,8 @@
 
 <p align="center"><strong>v1.0 is here</strong> — the full framework is published on NuGet. Every layer, from the foundation to the app-facing runtime umbrellas, is released and ready to install.</p>
 
+<p align="center"><strong>Building with an AI assistant?</strong> Install the official <a href="https://github.com/cirreum/skills">Cirreum skills</a> so it writes idiomatic, compiling Cirreum code:<br/><code>/plugin marketplace add cirreum/skills</code> &nbsp;→&nbsp; <code>/plugin install cirreum@cirreum-skills</code></p>
+
 ---
 
 ## Build .NET applications once — run them across API, Blazor, and serverless hosts
