@@ -73,6 +73,30 @@ Authorization, validation, logging, caching, and error handling are applied by t
 
 ---
 
+## One shape, all the way down
+
+Every capability in a Cirreum application is expressed the same way: an operation contract, a handler, and a typed result.
+
+```csharp
+public record GetCustomer(Guid Id) : IAuthorizableOperation<Customer>;
+
+public sealed class GetCustomerHandler(IRepository<CustomerEntity> repository)
+    : IOperationHandler<GetCustomer, Customer> {
+
+    public async Task<Result<Customer>> HandleAsync(
+        GetCustomer request, CancellationToken cancellationToken) =>
+            await repository.GetByIdAsync(request.Id, cancellationToken) is { } entity
+                ? entity.MapToCustomer()
+                : Result<Customer>.Fail(new NotFoundException("Customer not found"));
+}
+```
+
+Adding a feature is mechanical: write one record and one handler. Validation, authorization, logging, caching, and HTTP mapping already apply through the pipeline — there is no per-feature wiring, and nothing bespoke for each new operation to get wrong.
+
+Because the shape never varies and the domain never reaches into infrastructure, the whole application stays uniform to read, to extend, and to generate. The same contract an endpoint dispatches is the one a Blazor component, a function, or a background worker dispatches — one description of intent, consumed everywhere.
+
+---
+
 ## What Cirreum gives you
 
 - **A shared operation pipeline** for commands, queries, and application workflows
@@ -289,6 +313,7 @@ For the full repo-by-repo catalog, see [Full Library Catalog](#full-library-cata
 Cirreum is built around a few principles:
 
 - business logic should not depend on the host
+- every capability should have the same shape, so the codebase stays uniform to extend and to generate
 - expected failures should be explicit, not exception-driven
 - authorization and validation should be centralized
 - infrastructure should be replaceable
