@@ -42,21 +42,22 @@ Cirreum solves this by putting your application operations behind a shared execu
 You write the operation once:
 
 ```csharp
-public record GetCustomer(Guid Id) : IAuthorizableOperation<Customer>;
+public record GetCustomer(string Id) : IAuthorizableOperation<Customer>;
 
 public sealed class GetCustomerHandler(
     IRepository<CustomerEntity> repository
 ) : IOperationHandler<GetCustomer, Customer> {
 
     public async Task<Result<Customer>> HandleAsync(
-        GetCustomer request,
+        GetCustomer operation,
         CancellationToken cancellationToken) {
 
-        var entity = await repository.GetByIdAsync(request.Id, cancellationToken);
+        var entity = await repository.FirstOrNullAsync(
+            c => c.Id == operation.Id, includeDeleted: false, cancellationToken);
 
         return entity is not null
             ? entity.MapToCustomer()
-            : Result<Customer>.Fail(new NotFoundException("Customer not found"));
+            : Result<Customer>.Fail(new NotFoundException(operation.Id));
     }
 }
 ```
@@ -78,16 +79,21 @@ Authorization, validation, logging, caching, and error handling are applied by t
 Every capability in a Cirreum application is expressed the same way: an operation contract, a handler, and a typed result.
 
 ```csharp
-public record GetCustomer(Guid Id) : IAuthorizableOperation<Customer>;
+public record GetCustomer(string Id) : IAuthorizableOperation<Customer>;
 
 public sealed class GetCustomerHandler(IRepository<CustomerEntity> repository)
     : IOperationHandler<GetCustomer, Customer> {
 
     public async Task<Result<Customer>> HandleAsync(
-        GetCustomer request, CancellationToken cancellationToken) =>
-            await repository.GetByIdAsync(request.Id, cancellationToken) is { } entity
-                ? entity.MapToCustomer()
-                : Result<Customer>.Fail(new NotFoundException("Customer not found"));
+        GetCustomer operation, CancellationToken cancellationToken) {
+
+        var entity = await repository.FirstOrNullAsync(
+            c => c.Id == operation.Id, includeDeleted: false, cancellationToken);
+
+        return entity is not null
+            ? entity.MapToCustomer()
+            : Result<Customer>.Fail(new NotFoundException(operation.Id));
+    }
 }
 ```
 
@@ -176,7 +182,7 @@ Instead of throwing exceptions for expected application outcomes, handlers retur
 ```csharp
 return customer is not null
     ? Result<Customer>.Success(customer)
-    : Result<Customer>.Fail(new NotFoundException("Customer not found"));
+    : Result<Customer>.Fail(new NotFoundException(id));
 ```
 
 ---
@@ -202,7 +208,7 @@ app.UseDefaultMiddleware();
 
 app.MapApiEndpoints("/api/v1", api => {
     api.MapGet("/customers/{id}", static async (
-        Guid id,
+        string id,
         IDispatcher dispatcher,
         CancellationToken cancellationToken) =>
             await dispatcher.DispatchAsync(new GetCustomer(id), cancellationToken));
@@ -214,7 +220,7 @@ await app.RunAsync();
 Define an operation:
 
 ```csharp
-public record GetCustomer(Guid Id) : IAuthorizableOperation<Customer>;
+public record GetCustomer(string Id) : IAuthorizableOperation<Customer>;
 ```
 
 Implement a handler:
@@ -225,14 +231,15 @@ public sealed class GetCustomerHandler(
 ) : IOperationHandler<GetCustomer, Customer> {
 
     public async Task<Result<Customer>> HandleAsync(
-        GetCustomer request,
+        GetCustomer operation,
         CancellationToken cancellationToken) {
 
-        var entity = await repository.GetByIdAsync(request.Id, cancellationToken);
+        var entity = await repository.FirstOrNullAsync(
+            c => c.Id == operation.Id, includeDeleted: false, cancellationToken);
 
         return entity is not null
             ? entity.MapToCustomer()
-            : Result<Customer>.Fail(new NotFoundException("Customer not found"));
+            : Result<Customer>.Fail(new NotFoundException(operation.Id));
     }
 }
 ```
@@ -246,7 +253,7 @@ That operation can now flow through validation, authorization, result handling, 
 A handler returns a domain result:
 
 ```csharp
-return Result<Customer>.Fail(new NotFoundException("Customer not found"));
+return Result<Customer>.Fail(new NotFoundException(id));
 ```
 
 The server runtime maps it to the correct HTTP response:
@@ -520,7 +527,7 @@ Every Cirreum repo, organized by folder. Each folder is a layer; within a layer,
 | Package | Track | Description |
 | --------- | ------- | ------------- |
 | [Cirreum.Result](https://github.com/cirreum/Cirreum.Result) | main | Struct-based, allocation-free `Result` / `Result<T>` monad with full async support and monadic composition (Map, Then, Ensure, Match, Switch). |
-| [Cirreum.Exceptions](https://github.com/cirreum/Cirreum.Exceptions) | main | Typed exception hierarchy (`NotFoundException`, `ForbiddenException`, `ValidationException`, …) designed to be captured as `Result<T>.Fail(...)`. RFC 7807 ProblemDetails mapping. |
+| [Cirreum.Exceptions](https://github.com/cirreum/Cirreum.Exceptions) | main | Typed exception hierarchy (`NotFoundException`, `ForbiddenAccessException`, `BadRequestException`, `ConflictException`, …) designed to be captured as `Result<T>.Fail(...)`. RFC 7807 ProblemDetails mapping. |
 | [Cirreum.Kernel](https://github.com/cirreum/Cirreum.Kernel) | main | Foundational cross-host abstractions, contracts, value types, and the framework bootstrap surface. |
 
 ### Common — framework-neutral, host-agnostic abstractions
@@ -657,10 +664,10 @@ public async Task<ResourceDto> GetResource(string id) {
     try {
         var resource = await _repository.GetById(id);
         if (resource == null) {
-            throw new NotFoundException("Resource not found");
+            throw new KeyNotFoundException("Resource not found");
         }
         if (!await _authService.CanAccess(resource)) {
-            throw new ForbiddenException("Access denied");
+            throw new ForbiddenAccessException("Access denied");
         }
         return MapToDto(resource);
     } catch (Exception ex) {
@@ -671,15 +678,12 @@ public async Task<ResourceDto> GetResource(string id) {
 
 // Cirreum approach (no-throw)
 public async Task<Result<Resource>> HandleAsync(GetResourceQuery query, CancellationToken ct) {
-    var entity = await _repository.GetById(query.Id, ct);
+    var entity = await _repository.FirstOrNullAsync(
+        r => r.Id == query.Id, includeDeleted: false, ct);
 
-    // Implicit-cast for simple case
-    return entity.Map(); // your extension method maps to 'Resource' model/dto
-
-    // Or, you control the exception type
     return entity is not null
-        ? Result<Resource>.Success(entity.Map())
-        : Result<Resource>.Fail(new NotFoundException("Resource not found"));
+        ? Result<Resource>.Success(entity.Map()) // your extension maps entity -> 'Resource' model/dto
+        : Result<Resource>.Fail(new NotFoundException(query.Id));
 
     // Authorization handled automatically by intercept
     // Logging handled by intercept
@@ -689,7 +693,7 @@ public async Task<Result<Resource>> HandleAsync(GetResourceQuery query, Cancella
 
 ### Result Composition
 
-Chain operations with `Map`, `Then`, and `Where`:
+Chain operations with `Map`, `Then`, and `Ensure`:
 
 ```csharp
 public async Task<Result<InvoiceDto>> HandleAsync(CreateInvoiceCommand cmd, CancellationToken ct) {
@@ -712,15 +716,14 @@ Define authorization rules using FluentValidation-style syntax:
 ```csharp
 public class DeleteResourceAuthorizer : AuthorizerBase<DeleteResourceCommand> {
     public DeleteResourceAuthorizer() {
-        RuleFor(context => context)
-            .RequireRole<AdminRole>()
-            .WithMessage("Only administrators can delete resources");
+        // Built-in helpers gate on the caller's effective roles:
+        this.HasAnyRole(ApplicationRoles.AppAdminRole, ApplicationRoles.AppManagerRole);
 
-        RuleFor(context => context.Resource.Id)
-            .MustAsync(async (id, ctx, ct) => {
-                var resource = await GetResource(id);
-                return resource.OwnerId == ctx.User.Id;
-            })
+        // Custom async rules run over AuthorizationContext<DeleteResourceCommand>:
+        //   context.AuthorizableObject is the command; context.UserId is the caller.
+        RuleFor(context => context)
+            .MustAsync(async (context, ct) =>
+                await CallerOwnsResource(context.AuthorizableObject.Id, context.UserId))
             .WithMessage("You can only delete your own resources");
     }
 }
@@ -738,7 +741,7 @@ The same operation can be dispatched from any host. The handler doesn't change; 
 
 ```csharp
 api.MapGet("/customers/{id}", static async (
-    Guid id,
+    string id,
     IDispatcher dispatcher,
     CancellationToken ct) =>
         await dispatcher.DispatchAsync(new GetCustomer(id), ct));
@@ -767,7 +770,7 @@ private async Task LoadCustomer() {
 public async Task<IActionResult> Run(
     [HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequest req) {
 
-    var result = await _dispatcher.DispatchAsync(new GetCustomer(Guid.Parse(req.Query["id"])));
+    var result = await _dispatcher.DispatchAsync(new GetCustomer(req.Query["id"]!));
 
     return result.Match(
         onSuccess: value => new OkObjectResult(value),
